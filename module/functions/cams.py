@@ -45,11 +45,11 @@ def import_cams(atm_data, cams_path):
     nline = len(atm_data.line)
     nsample = len(atm_data.sample)
 
-    atm_data["co2"] = (("level", "line", "sample"), np.zeros(shape = (nlevel, nline, nsample)))
+    atm_data["co2"] = (("level", "line", "sample"), np.empty(shape = (nlevel, nline, nsample)))
     atm_data.co2.attrs["standard_name"] = "CO2 molar mixing ratio"
     atm_data.co2.attrs["units"] = "mol mol-1"
 
-    atm_data["ch4"] = (("level", "line", "sample"), np.zeros(shape = (nlevel, nline, nsample)))
+    atm_data["ch4"] = (("level", "line", "sample"), np.empty(shape = (nlevel, nline, nsample)))
     atm_data.ch4.attrs["standard_name"] = "CH4 molar mixing ratio"
     atm_data.ch4.attrs["units"] = "mol mol-1"
 

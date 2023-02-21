@@ -24,17 +24,20 @@ def import_era5(atm_data, era5_folder_path):
         era5_data = xr.concat([era5_data, merged], dim = "time")
         merged.close()
 
+    ndatetime = len(era5_data.datetime)
+    nhybrid = len(era5_data.hybrid)
+    nlatitude = len(era5_data.latitude)
+    nlongitude = len(era5_data.longitude)
+
     # pressure for layers is given at lower boundary of the model level
     # pressure calculated using a and b parameters and the following manual:
     # https://www.ecmwf.int/sites/default/files/elibrary/2015/9210-part-iii-dynamics-and-numerical-procedures.pdf
     # a and b parameters downloaded from https://confluence.ecmwf.int/display/UDOC/L137+model+level+definitions
-    era5_data["pressure"] = xr.Variable(("time", "hybrid", "latitude", "longitude"),
-                                        np.empty((len(era5_data.time), len(era5_data.hybrid), len(era5_data.latitude), len(era5_data.longitude))))
+    era5_data["pressure"] = (("datetime", "hybrid", "latitude", "longitude"), np.empty(shape = (ndatetime, nhybrid, nlatitude, nlongitude)))
     n, a, b, ph, pf, gpa, gma, t, rho = np.genfromtxt("data/era5/standard_atmosphere.csv", delimiter = ",", skip_header = 2, unpack = True)
-    for hybrid in range(len(era5_data.hybrid)):
+    for hybrid in range(nhybrid):
         era5_data.pressure.values[:, hybrid, :, :] = a[hybrid] + b[hybrid] * era5_data.sp.values[:, :, :]
 
-    nhybrid = len(era5_data.hybrid)
     era5_data["geometric_altitude"] = (("hybrid"), gma)
     era5_data.geometric_altitude.attrs["standard_name"] = "geometric altitude"
     era5_data.geometric_altitude.attrs["units"] = "m"
@@ -68,26 +71,26 @@ def import_era5(atm_data, era5_folder_path):
     nline = len(atm_data.line)
     nsample = len(atm_data.sample)
 
-    atm_data["geometric_altitude"] = (("level", "line", "sample"), np.zeros(shape = (nlevel, nline, nsample)))
+    atm_data["geometric_altitude"] = (("level", "line", "sample"), np.empty(shape = (nlevel, nline, nsample)))
     atm_data.geometric_altitude.attrs["standard_name"] = "geometric altitude"
     atm_data.geometric_altitude.attrs["units"] = "m"
 
-    atm_data["pressure"] = (("level", "line", "sample"), np.zeros(shape = (nlevel, nline, nsample)))
+    atm_data["pressure"] = (("level", "line", "sample"), np.empty(shape = (nlevel, nline, nsample)))
     atm_data.pressure.attrs["standard_name"] = "pressure"
     atm_data.pressure.attrs["units"] = "kg m-1 s-2"
 
-    atm_data["temperature"] = (("level", "line", "sample"), np.zeros(shape = (nlevel, nline, nsample)))
+    atm_data["temperature"] = (("level", "line", "sample"), np.empty(shape = (nlevel, nline, nsample)))
     atm_data.temperature.attrs["standard_name"] = "temperature"
     atm_data.temperature.attrs["units"] = "K"
 
-    atm_data["h2o"] = (("level", "line", "sample"), np.zeros(shape = (nlevel, nline, nsample)))
+    atm_data["h2o"] = (("level", "line", "sample"), np.empty(shape = (nlevel, nline, nsample)))
     atm_data.h2o.attrs["standard_name"] = "molar mixing ratio of H2O"
     atm_data.h2o.attrs["units"] = "mol mol-1"
 
     # interpolation begins
     datetime = atm_data.datetime.values
-    for line in range(len(atm_data.line)):
-        for sample in range(len(atm_data.sample)):
+    for line in range(nline):
+        for sample in range(nsample):
             latitude = atm_data.latitude.values[line, sample]
             longitude = atm_data.longitude.values[line, sample]
 

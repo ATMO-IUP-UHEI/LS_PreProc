@@ -31,12 +31,14 @@ def import_aster(atm_data, aster_folder_path):
     aster_data.surface_elevation.attrs["units"] = "m"
 
     # prepare atm_data
-    atm_data["surface_elevation"] = (("line", "sample"), np.zeros(shape = (len(atm_data.line), len(atm_data.sample))))
+    nline = len(atm_data.line)
+    nsample = len(atm_data.sample)
+    atm_data["surface_elevation"] = (("line", "sample"), np.empty(shape = (nline, nsample)))
     atm_data.surface_elevation.attrs["standard_name"] = "surface elevation"
     atm_data.surface_elevation.attrs["units"] = "m"
 
-    for line in range(len(atm_data.line)):
-        for sample in range(len(atm_data.sample)):
+    for line in range(nline):
+        for sample in range(nsample):
             latitude = atm_data.latitude.values[line, sample]
             longitude = atm_data.longitude.values[line, sample]
 
