@@ -34,7 +34,7 @@ def import_era5(atm_data, era5_folder_path):
     # https://www.ecmwf.int/sites/default/files/elibrary/2015/9210-part-iii-dynamics-and-numerical-procedures.pdf
     # a and b parameters downloaded from https://confluence.ecmwf.int/display/UDOC/L137+model+level+definitions
     era5_data["pressure"] = (("datetime", "hybrid", "latitude", "longitude"), np.empty(shape = (ndatetime, nhybrid, nlatitude, nlongitude)))
-    n, a, b, ph, pf, gpa, gma, t, rho = np.genfromtxt("data/era5/standard_atmosphere.csv", delimiter = ",", skip_header = 2, unpack = True)
+    n, a, b, ph, pf, gpa, gma, t, rho = np.genfromtxt("data/era5/auxiliary/standard_atmosphere.csv", delimiter = ",", skip_header = 2, unpack = True)
     for hybrid in range(nhybrid):
         era5_data.pressure.values[:, hybrid, :, :] = a[hybrid] + b[hybrid] * era5_data.sp.values[:, :, :]
 
