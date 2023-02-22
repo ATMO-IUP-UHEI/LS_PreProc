@@ -53,4 +53,3 @@ def import_aster(atm_data, aster_folder_path):
             atm_data.surface_elevation.values[line, sample] = interpolated.surface_elevation.values
 
     aster_data.close()
-################################################################################

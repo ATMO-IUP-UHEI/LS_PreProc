@@ -40,7 +40,7 @@ def import_era5(atm_data, era5_folder_path):
     # https://www.ecmwf.int/sites/default/files/elibrary/2015/9210-part-iii-dynamics-and-numerical-procedures.pdf
     # a and b parameters downloaded from https://confluence.ecmwf.int/display/UDOC/L137+model+level+definitions
     era5_data["pressure"] = (("datetime", "model_level", "latitude", "longitude"), np.empty(shape = (ndatetime, nmodel_level, nlatitude, nlongitude)))
-    n, a, b, ph, pf, gpa, gma, t, rho = np.genfromtxt("data/era5/auxiliary/standard_atmosphere.csv", delimiter = ",", skip_header = 2, unpack = True)
+    n, a, b, ph, pf, gpa, gma, t, rho = np.genfromtxt("data/external/era5/auxiliary/standard_atmosphere.csv", delimiter = ",", skip_header = 2, unpack = True)
     for model_level in range(nmodel_level):
         era5_data.pressure.values[:, model_level, :, :] = a[model_level] + b[model_level] * era5_data.surface_pressure.values[:, :, :]
 
@@ -84,7 +84,7 @@ def import_era5(atm_data, era5_folder_path):
     atm_data.temperature.attrs["units"] = "K"
 
     atm_data["h2o"] = (("level", "line", "sample"), np.empty(shape = (nlevel, nline, nsample)))
-    atm_data.h2o.attrs["standard_name"] = "molar mixing ratio of H2O"
+    atm_data.h2o.attrs["standard_name"] = "H2O molar mixing ratio"
     atm_data.h2o.attrs["units"] = "mol mol-1"
 
     # interpolation begins
@@ -149,4 +149,3 @@ def import_era5(atm_data, era5_folder_path):
             atm_data.h2o[:, line, sample] = h2o
 
     era5_data.close()
-################################################################################
