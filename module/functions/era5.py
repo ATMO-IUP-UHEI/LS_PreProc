@@ -2,9 +2,10 @@ import numpy as np
 import xarray as xr
 import cfgrib
 
-import functions.constants as const
+import functions.constants as constants
 
 def import_era5(atm_data, era5_folder_path):
+    # get era5_data
     # era5 data comes in hourly files. Every time step includes a multi-layer dataset and a surface dataset.
     # Here, the time steps surrounding the measurement are loaded in and combined into one dataset.
     era5_datetime_list = ["2019080614", "2019080615"]
@@ -24,8 +25,13 @@ def import_era5(atm_data, era5_folder_path):
         era5_data = xr.concat([era5_data, merged], dim = "time")
         merged.close()
 
+    # prepare era5_data
+    era5_data = era5_data.drop(["number", "step", "time", "surface"])
+    era5_data = era5_data.rename({"hybrid": "model_level", "valid_time": "datetime", "time": "datetime"})
+    era5_data = era5_data.rename({"z": "surface_geopotential", "t": "temperature", "q": "specific_humidity", "sp": "surface_pressure"})
+
     ndatetime = len(era5_data.datetime)
-    nhybrid = len(era5_data.hybrid)
+    nmodel_level = len(era5_data.model_level)
     nlatitude = len(era5_data.latitude)
     nlongitude = len(era5_data.longitude)
 
@@ -33,19 +39,14 @@ def import_era5(atm_data, era5_folder_path):
     # pressure calculated using a and b parameters and the following manual:
     # https://www.ecmwf.int/sites/default/files/elibrary/2015/9210-part-iii-dynamics-and-numerical-procedures.pdf
     # a and b parameters downloaded from https://confluence.ecmwf.int/display/UDOC/L137+model+level+definitions
-    era5_data["pressure"] = (("datetime", "hybrid", "latitude", "longitude"), np.empty(shape = (ndatetime, nhybrid, nlatitude, nlongitude)))
+    era5_data["pressure"] = (("datetime", "model_level", "latitude", "longitude"), np.empty(shape = (ndatetime, nmodel_level, nlatitude, nlongitude)))
     n, a, b, ph, pf, gpa, gma, t, rho = np.genfromtxt("data/era5/auxiliary/standard_atmosphere.csv", delimiter = ",", skip_header = 2, unpack = True)
-    for hybrid in range(nhybrid):
-        era5_data.pressure.values[:, hybrid, :, :] = a[hybrid] + b[hybrid] * era5_data.sp.values[:, :, :]
+    for model_level in range(nmodel_level):
+        era5_data.pressure.values[:, model_level, :, :] = a[model_level] + b[model_level] * era5_data.surface_pressure.values[:, :, :]
 
-    era5_data["geometric_altitude"] = (("hybrid"), gma)
+    era5_data["geometric_altitude"] = (("model_level"), gma)
     era5_data.geometric_altitude.attrs["standard_name"] = "geometric altitude"
     era5_data.geometric_altitude.attrs["units"] = "m"
-
-    # cleaning up the dataset. Renaming variables and giving them attributes so they are more readable
-    era5_data = era5_data.drop(["number", "step", "time", "surface", "sp"])
-    era5_data = era5_data.rename({"hybrid": "model_level", "valid_time": "datetime", "time": "datetime"})
-    era5_data = era5_data.rename({"z": "surface_geopotential", "t": "temperature", "q": "specific_humidity"})
 
     era5_data.latitude.attrs["standard_name"] = "latitude"
     era5_data.latitude.attrs["units"] = "degrees north"
@@ -65,8 +66,7 @@ def import_era5(atm_data, era5_folder_path):
     era5_data.specific_humidity.attrs["standard_name"] = "specific humidity"
     era5_data.specific_humidity.attrs["units"] = "kg kg-1"
 
-    # interpolate era5 data onto l1b grid and time and write to atm_data
-    # atm_data will get its own pressure grid
+    # prepare atm_data
     nlevel = 60
     nline = len(atm_data.line)
     nsample = len(atm_data.sample)
@@ -117,7 +117,7 @@ def import_era5(atm_data, era5_folder_path):
 
             # the lowest level of the altitude profile is just above the ground
             # data profiles must be extended downwards to touch the surface
-            scale_height = interpolated.temperature.values[-1] * const.constants["gas_constant"] / const.constants["molar_mass_dry_air"] / const.gravitational_acceleration()
+            scale_height = interpolated.temperature.values[-1] * constants.gas_constant / constants.molar_mass_dry_air / constants.gravitational_acceleration()
 
             # surface altitude is set to digital elevation model altitude
             interpolated.geometric_altitude.values[-1] = dem_surface_elevation
@@ -126,7 +126,7 @@ def import_era5(atm_data, era5_folder_path):
             interpolated.pressure.values[-1] = interpolated.pressure.values[-1] * np.exp(surface_altitude_difference / scale_height)
             
             # temperature is extended according to adiabatic lapse rate
-            interpolated.temperature.values[-1] = interpolated.temperature.values[-1] - const.constants["lapse_rate_lower_troposphere"] * surface_altitude_difference
+            interpolated.temperature.values[-1] = interpolated.temperature.values[-1] - constants.lapse_rate_lower_troposphere * surface_altitude_difference
 
             # specific humidity is extended downwards constantly (no change necessary, because value at index -1 is already correct)
 
@@ -145,7 +145,7 @@ def import_era5(atm_data, era5_folder_path):
             # m_HUM = m_DRY + m_H2O
             # to find: molar_mixing_ratio = N_H2O / N_DRY = s/(1-s) * M_DRY/M_H2O
             s = interpolated.specific_humidity.values
-            h2o = s / (1 - s) * const.constants["molar_mass_dry_air"] / const.constants["molar_mass_h2o"]
+            h2o = s / (1 - s) * constants.molar_mass_dry_air / constants.molar_mass_h2o
             atm_data.h2o[:, line, sample] = h2o
 
     era5_data.close()

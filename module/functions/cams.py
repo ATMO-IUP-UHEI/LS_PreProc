@@ -2,10 +2,10 @@ import xarray as xr
 import cfgrib
 import numpy as np
 
-import functions.constants as const
+import functions.constants as constants
 
 def import_cams(atm_data, cams_path):
-    # cams is provided in daily files.
+    # get cams_data
     cams_date_list = ["20190806"]
     cams_data_set = False
     for cams_date in cams_date_list:
@@ -19,6 +19,7 @@ def import_cams(atm_data, cams_path):
         cams_data = xr.concat([cams_data, data], dim = "time")
         data.close()
 
+    # prepare cams_data
     cams_data = cams_data.drop(["step", "time", "number"])
     cams_data = cams_data.rename({"valid_time": "datetime", "step": "datetime"})
     cams_data = cams_data.rename({"isobaricInhPa": "pressure"})
@@ -53,7 +54,7 @@ def import_cams(atm_data, cams_path):
     atm_data.ch4.attrs["standard_name"] = "CH4 molar mixing ratio"
     atm_data.ch4.attrs["units"] = "mol mol-1"
 
-
+    # interpolation begins
     datetime = atm_data.datetime.values
     for line in range(nline):
         for sample in range(nsample):
@@ -87,7 +88,7 @@ def import_cams(atm_data, cams_path):
             # instead of mass fraction, molar mixing ratio is written to atm_data.
             # use:
             # m_x = N_X * M_X
-            atm_data.co2[:, line, sample] = interpolated.co2_mass_fraction.values * const.constants["molar_mass_dry_air"] / const.constants["molar_mass_co2"]
-            atm_data.ch4[:, line, sample] = interpolated.ch4_mass_fraction.values * const.constants["molar_mass_dry_air"] / const.constants["molar_mass_ch4"]
+            atm_data.co2[:, line, sample] = interpolated.co2_mass_fraction.values * constants.molar_mass_dry_air / constants.molar_mass_co2
+            atm_data.ch4[:, line, sample] = interpolated.ch4_mass_fraction.values * constants.molar_mass_dry_air / constants.molar_mass_ch4
 
     cams_data.close()

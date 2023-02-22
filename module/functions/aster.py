@@ -3,6 +3,7 @@ import rioxarray
 import numpy as np
 
 def import_aster(atm_data, aster_folder_path):
+    # get aster_data
     aster_latlon_list = ["N49E008"]
     aster_data_set = False
     for aster_latlon in aster_latlon_list:
@@ -17,6 +18,7 @@ def import_aster(atm_data, aster_folder_path):
 
         tmp_data.close()
 
+    # prepare aster_data
     aster_data = aster_data.squeeze(dim = "band")
     aster_data = aster_data.drop(["spatial_ref", "band"])
     aster_data = aster_data.rename({"x": "longitude", "y": "latitude", "band_data": "surface_elevation"})
@@ -37,6 +39,8 @@ def import_aster(atm_data, aster_folder_path):
     atm_data.surface_elevation.attrs["standard_name"] = "surface elevation"
     atm_data.surface_elevation.attrs["units"] = "m"
 
+
+    # interpolation of aster_data and populating atm_data
     for line in range(nline):
         for sample in range(nsample):
             latitude = atm_data.latitude.values[line, sample]
