@@ -1,0 +1,10 @@
+download script for era5 data downloads surface pressure incorrectly
+fix this, then the downloaders should be complete?
+also: change the way the era5 file is read in era5 function
+
+equation 2.22
+era5 subroutine interpolate linearly in pressure instead of model level
+
+save datetime as string so fortran can read it more easily. convert to numpy datetime at the start of preprocessor and convert back at the end
+
+gravitational constant at surface, make dependant on lat and lon (see read_ecmwf.f90 ll. 947ff.)

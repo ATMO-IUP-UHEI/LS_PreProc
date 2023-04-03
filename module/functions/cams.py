@@ -4,12 +4,67 @@ import numpy as np
 
 import functions.constants as constants
 
-def import_cams(atm_data, cams_path):
-    # get cams_data
-    cams_date_list = ["20190806"]
+def main(atm_data, cams_folder_path):
+    print("getting cams data")
+
+    # get cams_data from the folder.
+    # name(s) of the required file will be constructed from the information in atm_data
+    cams_data = get_cams_data(atm_data, cams_folder_path)
+
+    # drop unnecessary variables from cams_data and rename needed ones
+    cams_data = prepare_cams_data(cams_data)
+
+    # prepare variables for atm_data
+    atm_data = prepare_atm_data(atm_data)
+
+    # interpolation begins
+    interpolated_full = cams_data.interp(latitude = atm_data.latitude, longitude = atm_data.longitude, datetime = atm_data.datetime, pressure = atm_data.pressure)
+
+    nline = len(atm_data.line.values)
+    nsample = len(atm_data.sample.values)
+
+    for line in range(nline):
+        for sample in range(nsample):
+            interpolated = interpolated_full.isel(line = line, sample = sample)
+
+            # if the vertical pressure profile of cams does not surround the vertical pressure profile of
+            # the atm_data, then the trace gas profiles will be cut off. They are extended constantly upwards
+            # and downwards by replacing all nan values at the array boundaries by their nearest neighbor non-nan
+            # value
+            # write molar mixing ratio to atm_data, not mass fraction
+            # use:
+            #     m_x = N_X * M_X
+
+            # co2
+            non_nan_indices = np.where(~np.isnan(interpolated.co2_mass_fraction.values))[0]
+            first_non_nan = non_nan_indices[0]
+            last_non_nan = non_nan_indices[-1]
+            interpolated.co2_mass_fraction.values[:first_non_nan] = interpolated.co2_mass_fraction.values[first_non_nan]
+            interpolated.co2_mass_fraction.values[last_non_nan:] = interpolated.co2_mass_fraction.values[last_non_nan]
+            atm_data.co2[:, line, sample] = interpolated.co2_mass_fraction.values * constants.molar_mass_dry_air / constants.molar_mass_co2
+
+            # ch4
+            non_nan_indices = np.where(~np.isnan(interpolated.ch4_mass_fraction.values))[0]
+            first_non_nan = non_nan_indices[0]
+            last_non_nan = non_nan_indices[-1]
+            interpolated.ch4_mass_fraction.values[:first_non_nan] = interpolated.ch4_mass_fraction.values[first_non_nan]
+            interpolated.ch4_mass_fraction.values[last_non_nan:] = interpolated.ch4_mass_fraction.values[last_non_nan]
+            atm_data.ch4[:, line, sample] = interpolated.ch4_mass_fraction.values * constants.molar_mass_dry_air / constants.molar_mass_ch4
+
+    cams_data.close()
+
+    return atm_data
+
+
+
+def get_cams_data(atm_data, cams_folder_path):
+    file_name_list = generate_file_list_from_atm_data(atm_data)
+
     cams_data_set = False
-    for cams_date in cams_date_list:
-        data = xr.open_dataset(f"{cams_path}/cams_rea{cams_date}.grb", engine = "cfgrib")
+    for file_name in file_name_list:
+        # loop can theoretically handle multiple datetime entries, but this is not implemented
+        # in the rest of the scripts
+        data = xr.open_dataset(f"{cams_folder_path}/{file_name}", engine = "cfgrib")
 
         if not cams_data_set:
             cams_data = data
@@ -19,6 +74,21 @@ def import_cams(atm_data, cams_path):
         cams_data = xr.concat([cams_data, data], dim = "time")
         data.close()
 
+    return cams_data
+
+
+
+def generate_file_list_from_atm_data(atm_data):
+    datetime = str(atm_data.datetime.values)
+    yyyymmdd = "".join(datetime[:10].split("-"))
+
+    file_name_list = [f"egg4_{yyyymmdd}.grb"]
+
+    return file_name_list
+
+
+
+def prepare_cams_data(cams_data):
     # prepare cams_data
     cams_data = cams_data.drop(["step", "time", "number"])
     cams_data = cams_data.rename({"valid_time": "datetime", "step": "datetime"})
@@ -41,54 +111,26 @@ def import_cams(atm_data, cams_path):
     cams_data.ch4_mass_fraction.attrs["standard_name"] = "CH4 mass fraction"
     cams_data.ch4_mass_fraction.attrs["units"] = "kg kg-1"
 
+    return cams_data
+
+
+
+def prepare_atm_data(atm_data):
     # prepare atm_data
     nlevel = len(atm_data.level)
     nline = len(atm_data.line)
     nsample = len(atm_data.sample)
 
     atm_data["co2"] = (("level", "line", "sample"), np.empty(shape = (nlevel, nline, nsample)))
-    atm_data.co2.attrs["standard_name"] = "CO2 molar mixing ratio"
+    atm_data.co2.attrs["standard_name"] = "CO2 mole fraction"
     atm_data.co2.attrs["units"] = "mol mol-1"
 
     atm_data["ch4"] = (("level", "line", "sample"), np.empty(shape = (nlevel, nline, nsample)))
-    atm_data.ch4.attrs["standard_name"] = "CH4 molar mixing ratio"
+    atm_data.ch4.attrs["standard_name"] = "CH4 mole fraction"
     atm_data.ch4.attrs["units"] = "mol mol-1"
 
-    # interpolation begins
-    datetime = atm_data.datetime.values
-    for line in range(nline):
-        for sample in range(nsample):
-            latitude = atm_data.latitude.values[line, sample]
-            longitude = atm_data.longitude.values[line, sample]
-            pressure = atm_data.pressure.values[:, line, sample]
+    return atm_data
 
-            # interpolate
-            interpolated = cams_data.interp(latitude = latitude, longitude = longitude, datetime = datetime, pressure = pressure)
 
-            # if the vertical pressure profile of cams does not surround the vertical pressure profile of
-            # the atm_data, then the trace gas profiles will be cut off. They are extended constantly upwards
-            # and downwards by replacing all nan values at the array boundaries by their nearest neighbor non-nan
-            # value
-
-            # co2
-            non_nan_indices = np.where(~np.isnan(interpolated.co2_mass_fraction.values))[0]
-            first_non_nan = non_nan_indices[0]
-            last_non_nan = non_nan_indices[-1]
-            interpolated.co2_mass_fraction.values[:first_non_nan] = interpolated.co2_mass_fraction.values[first_non_nan]
-            interpolated.co2_mass_fraction.values[last_non_nan:] = interpolated.co2_mass_fraction.values[last_non_nan]
-
-            # ch4
-            non_nan_indices = np.where(~np.isnan(interpolated.ch4_mass_fraction.values))[0]
-            first_non_nan = non_nan_indices[0]
-            last_non_nan = non_nan_indices[-1]
-            interpolated.ch4_mass_fraction.values[:first_non_nan] = interpolated.ch4_mass_fraction.values[first_non_nan]
-            interpolated.ch4_mass_fraction.values[last_non_nan:] = interpolated.ch4_mass_fraction.values[last_non_nan]
-
-            # write to atm_data
-            # instead of mass fraction, molar mixing ratio is written to atm_data.
-            # use:
-            # m_x = N_X * M_X
-            atm_data.co2[:, line, sample] = interpolated.co2_mass_fraction.values * constants.molar_mass_dry_air / constants.molar_mass_co2
-            atm_data.ch4[:, line, sample] = interpolated.ch4_mass_fraction.values * constants.molar_mass_dry_air / constants.molar_mass_ch4
-
-    cams_data.close()
+if __name__ == "__main__":
+    main(atm_data, cams_folder_path)

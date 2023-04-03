@@ -12,6 +12,8 @@ import functions.cams as cams
 
 import cfgrib
 
+import time
+
 # prepare atm file
 atm_data = atm.prepare_atm()
 
@@ -21,19 +23,19 @@ l1b.import_l1b_grid_example(atm_data, "data/input/L1B_example.nc")
 
 # gather surface elevation from aster file
 # the spatial grid is interpolated onto the l1b spatial grid
-aster.import_aster(atm_data, "data/external/aster/download")
+atm_data = aster.main(atm_data, "data/external/aster/download")
 
 # era5 has highest resolution for pressure grid (137 model layers)
 # the spatial grid is interpolated onto the l1b spatial grid
 # the vertical pressure grid is gathered from era5
 # the temporal grid is interpolated onto the l1b temporal grid
-era5.import_era5(atm_data, "data/external/era5/download")
+atm_data = era5.main(atm_data, "data/external/era5/download")
 
 # cams has vertical trace gas profiles
 # the spatial grid is interpolated onto the l1b spatial grid
 # the vertical pressure grid is interpolated onto the era5 vertical pressure grid
 # the temporal grid is interpolated onto the l1b temporal grid
-cams.import_cams(atm_data, "data/external/cams/download")
+atm_data = cams.main(atm_data, "data/external/cams/download")
 
-print(atm_data)
+print(f"finished atm_data = {atm_data}")
 atm_data.to_netcdf("data/output/ATM_example.nc", mode = "w", format = "NETCDF4")
