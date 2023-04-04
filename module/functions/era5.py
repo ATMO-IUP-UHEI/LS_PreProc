@@ -31,21 +31,6 @@ def main(atm_data, era5_folder_path):
     # interpolate linearly with pressure onto vertical atm_data grid
     atm_data = write_to_atm_data(interpolated, atm_data)
 
-    import sys
-    sys.exit()
-
-    return atm_data
-
-def write_to_atm_data(interpolated, atm_data):
-    new_nlevel = len(atm_data.level)
-
-    line = 0
-    sample = 0
-    old_p_grid = interpolated.pressure[:, line, sample]
-    max_pressure = np.nanmax(old_p_grid)
-    min_pressure = np.nanmin(old_p_grid)
-    new_p_grid = np.linspace(min_pressure, max_pressure, new_nlevel)
-
     return atm_data
 
     # geometric altitude (needs geopotential, which in turn needs virtual temperature, which in turn needs mixing ratio, which in turn needs dew point temperature, which in turn needs relative humidity, which in turn needs mixing ratio, which in turn needs dew point (something's wrong, lmao))
@@ -303,6 +288,45 @@ def correct_elevation_for_pixel(interpolated_pixel, atm_data):
     interpolated_pixel.temperature[ground_level] = interpolated_pixel.temperature[ground_level-1] - constants.lapse_rate_lower_troposphere * elevation_difference
 
     # specific humidity is extended downwards constantly (no change necessary, because value at index -1 is already correct)
+
+    return interpolated_pixel
+
+
+
+def write_to_atm_data(interpolated, atm_data):
+    # operations need to be performed on each line, sample pixel of the interpolated dataset
+    # this is done here by grouping the dataset by location. Since grouping by multiple
+    # dimensions is not supported by xarray, yet, line and sample are stacked into a new
+    # dimension called location, first. After modifying the dataset it is unstacked again
+    interpolated = interpolated.stack(location=["line", "sample"])
+    interpolated = interpolated.groupby("location")
+    interpolated = interpolated.apply(interpolate_pixel_to_atm_pressure, args=[atm_data])
+    interpolated = interpolated.unstack("location")
+    interpolated = interpolated.drop_vars(["line", "sample"])
+
+    atm_data.temperature.values = interpolated.temperature.values
+    atm_data.pressure.values = interpolated.pressure.values
+    atm_data.geometric_altitude.values = interpolated.geometric_altitude.values
+    atm_data.h2o.values = interpolated.h2o.values
+
+    return atm_data
+
+
+
+def interpolate_pixel_to_atm_pressure(interpolated_pixel, atm_data):
+    atm_nlevel = 60
+    min_pressure = np.nanmin(interpolated_pixel.pressure)
+    min_pressure = np.nanmax([2, min_pressure])
+    max_pressure = np.nanmax(interpolated_pixel.pressure)
+    level_grid = interpolated_pixel.level.values
+    pressure_grid = interpolated_pixel.pressure.values
+
+    # interpolate onto grid linear in pressure (there has to be a built in function for this)
+    new_pressure_grid = np.linspace(min_pressure, max_pressure, atm_nlevel)
+    new_level_grid = np.interp(new_pressure_grid, pressure_grid, level_grid)
+    interpolated_pixel = interpolated_pixel.interp(level=new_level_grid)
+
+    interpolated_pixel = interpolated_pixel.drop_vars(["level"])
 
     return interpolated_pixel
 

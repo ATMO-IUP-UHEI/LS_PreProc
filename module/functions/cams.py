@@ -17,41 +17,17 @@ def main(atm_data, cams_folder_path):
     # prepare variables for atm_data
     atm_data = prepare_atm_data(atm_data)
 
-    # interpolation begins
-    interpolated_full = cams_data.interp(latitude = atm_data.latitude, longitude = atm_data.longitude, datetime = atm_data.datetime, pressure = atm_data.pressure)
+    # interpolate to datetime and lat/lon grid of measurement
+    interpolated = interpolate_cams_to_atm(cams_data, atm_data)
 
-    nline = len(atm_data.line.values)
-    nsample = len(atm_data.sample.values)
+    # extrapolate the vertical profile if cams pressure grid doesn't fully cover atm pressure grid
+    interpolated = extrapolate_vertical_profile(interpolated)
 
-    for line in range(nline):
-        for sample in range(nsample):
-            interpolated = interpolated_full.isel(line = line, sample = sample)
+    # calculate mole fraction from mass fraction
+    interpolated = calculate_quantities_of_interest(interpolated)
 
-            # if the vertical pressure profile of cams does not surround the vertical pressure profile of
-            # the atm_data, then the trace gas profiles will be cut off. They are extended constantly upwards
-            # and downwards by replacing all nan values at the array boundaries by their nearest neighbor non-nan
-            # value
-            # write molar mixing ratio to atm_data, not mass fraction
-            # use:
-            #     m_x = N_X * M_X
-
-            # co2
-            non_nan_indices = np.where(~np.isnan(interpolated.co2_mass_fraction.values))[0]
-            first_non_nan = non_nan_indices[0]
-            last_non_nan = non_nan_indices[-1]
-            interpolated.co2_mass_fraction.values[:first_non_nan] = interpolated.co2_mass_fraction.values[first_non_nan]
-            interpolated.co2_mass_fraction.values[last_non_nan:] = interpolated.co2_mass_fraction.values[last_non_nan]
-            atm_data.co2[:, line, sample] = interpolated.co2_mass_fraction.values * constants.molar_mass_dry_air / constants.molar_mass_co2
-
-            # ch4
-            non_nan_indices = np.where(~np.isnan(interpolated.ch4_mass_fraction.values))[0]
-            first_non_nan = non_nan_indices[0]
-            last_non_nan = non_nan_indices[-1]
-            interpolated.ch4_mass_fraction.values[:first_non_nan] = interpolated.ch4_mass_fraction.values[first_non_nan]
-            interpolated.ch4_mass_fraction.values[last_non_nan:] = interpolated.ch4_mass_fraction.values[last_non_nan]
-            atm_data.ch4[:, line, sample] = interpolated.ch4_mass_fraction.values * constants.molar_mass_dry_air / constants.molar_mass_ch4
-
-    cams_data.close()
+    # write mole fractions to atm_data
+    atm_data = write_to_atm_data(interpolated, atm_data)
 
     return atm_data
 
@@ -130,6 +106,84 @@ def prepare_atm_data(atm_data):
     atm_data.ch4.attrs["units"] = "mol mol-1"
 
     return atm_data
+
+
+
+def interpolate_cams_to_atm(cams_data, atm_data):
+    interpolated = cams_data.interp(latitude=atm_data.latitude, longitude=atm_data.longitude, datetime=atm_data.datetime, pressure=atm_data.pressure)
+
+    return interpolated
+
+
+
+def extrapolate_vertical_profile(interpolated):
+    # if the vertical pressure profile of cams does not surround the vertical pressure profile of
+    # the atm_data, then the trace gas profiles will be cut off. They are extended constantly upwards
+    # and downwards by replacing all nan values at the array boundaries by their nearest neighbor non-nan
+    # value
+    # operations need to be performed on each line, sample pixel of the interpolated dataset
+    # this is done here by grouping the dataset by location. Since grouping by multiple
+    # dimensions is not supported by xarray, yet, line and sample are stacked into a new
+    # dimension called location, first. After modifying the dataset it is unstacked again
+    interpolated = interpolated.stack(location=["line", "sample"])
+    interpolated = interpolated.groupby("location")
+    interpolated = interpolated.apply(extrapolate_vertical_profile_for_pixel)
+    interpolated = interpolated.unstack("location")
+    interpolated = interpolated.drop_vars(["line", "sample"])
+
+    return interpolated
+
+
+
+def extrapolate_vertical_profile_for_pixel(interpolated_pixel):
+    # co2
+    non_nan_indices = np.where(~np.isnan(interpolated_pixel.co2_mass_fraction.values))[0]
+    first_non_nan = non_nan_indices[0]
+    last_non_nan = non_nan_indices[-1]
+    interpolated_pixel.co2_mass_fraction.values[:first_non_nan] = interpolated_pixel.co2_mass_fraction.values[first_non_nan]
+    interpolated_pixel.co2_mass_fraction.values[last_non_nan:] = interpolated_pixel.co2_mass_fraction.values[last_non_nan]
+
+    # ch4
+    non_nan_indices = np.where(~np.isnan(interpolated_pixel.ch4_mass_fraction.values))[0]
+    first_non_nan = non_nan_indices[0]
+    last_non_nan = non_nan_indices[-1]
+    interpolated_pixel.ch4_mass_fraction.values[:first_non_nan] = interpolated_pixel.ch4_mass_fraction.values[first_non_nan]
+    interpolated_pixel.ch4_mass_fraction.values[last_non_nan:] = interpolated_pixel.ch4_mass_fraction.values[last_non_nan]
+
+    return interpolated_pixel
+
+
+
+def calculate_quantities_of_interest(interpolated):
+    nlevel = len(interpolated.level)
+    nline = len(interpolated.line)
+    nsample = len(interpolated.sample)
+
+    # write molar mixing ratio to atm_data, not mass fraction
+    # use:
+    # m_x = N_X * M_X
+
+    interpolated["co2"] = (("level", "line", "sample"), np.empty(shape=(nlevel, nline, nsample)))
+    interpolated.co2.attrs["standard_name"] = "CO2 mole fraction"
+    interpolated.co2.attrs["units"] = "mol mol-1"
+
+    interpolated["ch4"] = (("level", "line", "sample"), np.empty(shape=(nlevel, nline, nsample)))
+    interpolated.ch4.attrs["standard_name"] = "CH4 mole fraction"
+    interpolated.ch4.attrs["units"] = "mol mol-1"
+
+    interpolated.co2.values = interpolated.co2_mass_fraction * constants.molar_mass_dry_air / constants.molar_mass_co2
+
+    interpolated.ch4.values = interpolated.ch4_mass_fraction * constants.molar_mass_dry_air / constants.molar_mass_ch4
+
+    return interpolated
+
+
+
+def write_to_atm_data(interpolated, atm_data):
+    atm_data.co2.values = interpolated.co2.values
+    atm_data.ch4.values = interpolated.ch4.values
+    return atm_data
+
 
 
 if __name__ == "__main__":
