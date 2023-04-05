@@ -55,8 +55,7 @@ def get_cams_data(atm_data, cams_folder_path):
 
 
 def generate_file_list_from_atm_data(atm_data):
-    datetime = str(atm_data.datetime.values)
-    yyyymmdd = "".join(datetime[:10].split("-"))
+    yyyymmdd = "".join((atm_data.attrs["ISO 8601 datetime"].split("T")[0]).split("-"))
 
     file_name_list = [f"egg4_{yyyymmdd}.grb"]
 
@@ -110,7 +109,7 @@ def prepare_atm_data(atm_data):
 
 
 def interpolate_cams_to_atm(cams_data, atm_data):
-    interpolated = cams_data.interp(latitude=atm_data.latitude, longitude=atm_data.longitude, datetime=atm_data.datetime, pressure=atm_data.pressure)
+    interpolated = cams_data.interp(latitude=atm_data.latitude, longitude=atm_data.longitude, datetime=np.datetime64(atm_data.attrs["ISO 8601 datetime"]), pressure=atm_data.pressure)
 
     return interpolated
 

@@ -3,9 +3,7 @@ import xarray as xr
 def import_l1b_grid_example(atm_data, l1b_path):
     l1b_data = xr.open_dataset(l1b_path)
 
-    atm_data["datetime"] = l1b_data.datetime.values
-    atm_data.datetime.attrs = {}
-    atm_data.datetime.attrs["standard_name"] = "date and time of measurement"
+    atm_data.attrs["ISO 8601 datetime"] = l1b_data.attrs["ISO 8601 datetime"]
 
     nline = len(l1b_data.line)
     nsample = len(l1b_data.sample)

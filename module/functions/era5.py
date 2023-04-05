@@ -103,8 +103,7 @@ def get_era5_data(atm_data, era5_folder_path, era5_type):
 
 
 def generate_file_list_from_atm_data(atm_data, era5_type):
-    datetime = str(atm_data.datetime.values)
-    yyyymmdd = "".join(datetime[:10].split("-"))
+    yyyymmdd = "".join((atm_data.attrs["ISO 8601 datetime"].split("T")[0]).split("-"))
 
     file_name_list = [f"era5_{era5_type}_{yyyymmdd}.grb"]
 
@@ -179,8 +178,8 @@ def prepare_atm_data(atm_data):
 
 
 def interpolate_era5_to_atm(era5_ml_data, era5_sfc_data, atm_data):
-    interpolated_ml = era5_ml_data.interp(datetime = atm_data.datetime, latitude = atm_data.latitude, longitude = atm_data.longitude)
-    interpolated_sfc = era5_sfc_data.interp(datetime = atm_data.datetime, latitude = atm_data.latitude, longitude = atm_data.longitude)
+    interpolated_ml = era5_ml_data.interp(datetime = np.datetime64(atm_data.attrs["ISO 8601 datetime"]), latitude = atm_data.latitude, longitude = atm_data.longitude)
+    interpolated_sfc = era5_sfc_data.interp(datetime = np.datetime64(atm_data.attrs["ISO 8601 datetime"]), latitude = atm_data.latitude, longitude = atm_data.longitude)
     interpolated = xr.merge([interpolated_ml, interpolated_sfc])
 
     return interpolated
