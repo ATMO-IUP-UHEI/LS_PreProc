@@ -192,16 +192,16 @@ def calculate_quantities_of_interest(interpolated):
     nline = len(interpolated.line)
     nsample = len(interpolated.sample)
 
-    # get standard ecmwd atmosphere parameters from file
-    # TODO put info here where to get this file
-    # maybe check if it exists and if it doesn't print the remote location to the terminal
-    n, a, b, ph, pf, gpa, gma, t, rho = np.genfromtxt("data/external/era5/auxiliary/standard_atmosphere.csv", delimiter = ",", skip_header = 2, unpack = True)
+    # get standard ecmwd atmosphere parameters from file downloaded from https://confluence.ecmwf.int/display/UDOC/L137+model+level+definitions
+    try:
+        n, a, b, ph, pf, gpa, gma, t, rho = np.genfromtxt("data/external/era5/auxiliary/standard_atmosphere.csv", delimiter = ",", skip_header = 2, unpack = True)
+    except:
+        sys.exit("standard_atmosphere.csv missing. Download from https://confluence.ecmwf.int/display/UDOC/L137+model+level+definitions and put it into data/external/era5/auxiliary/")
 
     # pressure
     # pressure for layers is given at lower boundary of the model level
     # pressure calculated using a and b parameters and the following manual:
     # https://www.ecmwf.int/sites/default/files/elibrary/2015/9210-part-iii-dynamics-and-numerical-procedures.pdf
-    # a and b parameters downloaded from https://confluence.ecmwf.int/display/UDOC/L137+model+level+definitions
     interpolated["pressure"] = (("level", "line", "sample"), np.empty(shape = (nlevel, nline, nsample)))
     interpolated.pressure.attrs["standard_name"] = "pressure"
     interpolated.pressure.attrs["units"] = "kg m-1 s-2"
