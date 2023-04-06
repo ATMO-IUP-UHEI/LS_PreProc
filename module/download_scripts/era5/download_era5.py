@@ -19,13 +19,12 @@ def main():
 
     retrieve_parameters["grid"] = "0.25/0.25" # 0.25degx0.25deg grid
 
-    datetime = str(l1b_data.datetime.values)
-
-    yyyy_mm_dd = datetime[:10]
+    yyyy_mm_dd = l1b_data.attrs["ISO 8601 datetime"].split("T")[0]
     yyyymmdd = "".join(yyyy_mm_dd.split("-"))
+
     retrieve_parameters["date"] = yyyy_mm_dd
 
-    hh = int(datetime[11:13])
+    hh = int(l1b_data.attrs["ISO 8601 datetime"].split("T")[1].strip("Z").split(":")[0])
     if hh >= 23:
         sys.exit("get 23 of this day and 0 of next day. not implemented, yet.")
     time = [hh, hh+1]

@@ -14,12 +14,11 @@ def main():
 
     retrieve_parameters["variable"] = ["carbon_dioxide", "methane"]
 
-    datetime = str(l1b_data.datetime.values)
-
-    yyyy_mm_dd = datetime[:10]
+    yyyy_mm_dd = l1b_data.attrs["ISO 8601 datetime"].split("T")[0]
+    yyyymmdd = "".join(yyyy_mm_dd.split("-"))
     retrieve_parameters["date"] = f"{yyyy_mm_dd}/{yyyy_mm_dd}"
 
-    hh = int(datetime[11:13])
+    hh = int(l1b_data.attrs["ISO 8601 datetime"].split("T")[1].strip("Z").split(":")[0])
     if hh >=  0 and hh <  3: step = ["0", "3"]
     if hh >=  3 and hh <  6: step = ["3", "6"]
     if hh >=  6 and hh <  9: step = ["6", "9"]
@@ -51,10 +50,12 @@ def main():
         "300", "400", "500", "600", "700", "800", "850", "900", "925", "950", "1000"
     ]
 
-    yyyymmdd = "".join(yyyy_mm_dd.split("-"))
     output_file = f"output/egg4_{yyyymmdd}.grb"
 
     os.system("cp ~/.cdsapirc_ads ~/.cdsapirc")
+
+    print(database_name, retrieve_parameters, output_file)
+    sys.exit()
 
     c = cdsapi.Client()
     c.retrieve(
