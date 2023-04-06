@@ -2,3 +2,10 @@ venv
 *__pycache__/
 *.DS_Store
 *.idx
+
+# data should not be included
+module/data/input/*.nc
+
+module/download_scripts/aster/output/*
+module/download_scripts/era5/output/*
+module/download_scripts/cams/output/*
