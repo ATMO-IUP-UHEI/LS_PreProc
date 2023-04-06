@@ -1,3 +1,7 @@
 save datetime as string so fortran can read it more easily. convert to numpy datetime at the start of preprocessor and convert back at the end
 
 gravitational constant at surface, make dependant on lat and lon (see read_ecmwf.f90 ll. 947ff.)
+
+error handling if no argument is provided to download scripts
+
+provide name of l1b file as argument to core.py
