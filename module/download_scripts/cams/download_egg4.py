@@ -54,9 +54,6 @@ def main():
 
     os.system("cp ~/.cdsapirc_ads ~/.cdsapirc")
 
-    print(database_name, retrieve_parameters, output_file)
-    sys.exit()
-
     c = cdsapi.Client()
     c.retrieve(
         database_name,
