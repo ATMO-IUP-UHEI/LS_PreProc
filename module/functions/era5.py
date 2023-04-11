@@ -256,6 +256,8 @@ def correct_elevation(interpolated, atm_data):
 
 
 def correct_elevation_for_pixel(interpolated_pixel, atm_data):
+    nlevel = len(interpolated_pixel.level)
+
     # drop all altitudes from era5 that are below the dem surface elevation
     dem_surface_elevation = atm_data.isel(line=interpolated_pixel.line, sample=interpolated_pixel.sample).surface_elevation
     interpolated_pixel = interpolated_pixel.where(interpolated_pixel.geometric_altitude >= dem_surface_elevation)
