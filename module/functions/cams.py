@@ -92,15 +92,15 @@ def prepare_cams_data(cams_data):
 
 def prepare_atm_data(atm_data):
     # prepare atm_data
-    nlevel = len(atm_data.level)
     nline = len(atm_data.line)
     nsample = len(atm_data.sample)
+    nlevel = len(atm_data.level)
 
-    atm_data["co2"] = (("level", "line", "sample"), np.empty(shape = (nlevel, nline, nsample)))
+    atm_data["co2"] = (("line", "sample", "level"), np.empty(shape = (nline, nsample, nlevel)))
     atm_data.co2.attrs["standard_name"] = "CO2 mole fraction"
     atm_data.co2.attrs["units"] = "mol mol-1"
 
-    atm_data["ch4"] = (("level", "line", "sample"), np.empty(shape = (nlevel, nline, nsample)))
+    atm_data["ch4"] = (("line", "sample", "level"), np.empty(shape = (nline, nsample, nlevel)))
     atm_data.ch4.attrs["standard_name"] = "CH4 mole fraction"
     atm_data.ch4.attrs["units"] = "mol mol-1"
 
@@ -111,11 +111,25 @@ def prepare_atm_data(atm_data):
 def interpolate_cams_to_atm(cams_data, atm_data):
     interpolated = cams_data.interp(latitude=atm_data.latitude, longitude=atm_data.longitude, datetime=np.datetime64(atm_data.attrs["ISO 8601 datetime"]), pressure=atm_data.pressure)
 
+    interpolated = interpolated.transpose("line", "sample", "level")
+
     return interpolated
 
 
 
 def extrapolate_vertical_profile(interpolated):
+    # if the vertical pressure profile of cams does not surround the vertical pressure profile of
+    # the atm_data, then the trace gas profiles will be cut off. They are extended constantly upwards
+    # and downwards by replacing all nan values at the array boundaries by their nearest neighbor non-nan
+    # value
+
+    sys.exit("implement this")
+
+    return interpolated
+
+
+
+def extrapolate_vertical_profile_old(interpolated):
     # if the vertical pressure profile of cams does not surround the vertical pressure profile of
     # the atm_data, then the trace gas profiles will be cut off. They are extended constantly upwards
     # and downwards by replacing all nan values at the array boundaries by their nearest neighbor non-nan
@@ -129,6 +143,7 @@ def extrapolate_vertical_profile(interpolated):
     interpolated = interpolated.apply(extrapolate_vertical_profile_for_pixel)
     interpolated = interpolated.unstack("location")
     interpolated = interpolated.drop_vars(["line", "sample"])
+    interpolated = interpolated.transpose("line", "sample", "level")
 
     return interpolated
 
@@ -154,19 +169,19 @@ def extrapolate_vertical_profile_for_pixel(interpolated_pixel):
 
 
 def calculate_quantities_of_interest(interpolated):
-    nlevel = len(interpolated.level)
     nline = len(interpolated.line)
     nsample = len(interpolated.sample)
+    nlevel = len(interpolated.level)
 
     # write molar mixing ratio to atm_data, not mass fraction
     # use:
     # m_x = N_X * M_X
 
-    interpolated["co2"] = (("level", "line", "sample"), np.empty(shape=(nlevel, nline, nsample)))
+    interpolated["co2"] = (("line", "sample", "level"), np.empty(shape=(nline, nsample, nlevel)))
     interpolated.co2.attrs["standard_name"] = "CO2 mole fraction"
     interpolated.co2.attrs["units"] = "mol mol-1"
 
-    interpolated["ch4"] = (("level", "line", "sample"), np.empty(shape=(nlevel, nline, nsample)))
+    interpolated["ch4"] = (("line", "sample", "level"), np.empty(shape=(nline, nsample, nlevel)))
     interpolated.ch4.attrs["standard_name"] = "CH4 mole fraction"
     interpolated.ch4.attrs["units"] = "mol mol-1"
 

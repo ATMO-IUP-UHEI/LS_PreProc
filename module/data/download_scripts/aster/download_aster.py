@@ -40,7 +40,7 @@ def download_files(file_name_list):
     import sys
 
     with Session() as session:
-        token = getpass("Enter token. If you don't have a token, get one from https://urs.earthdata.nasa.gov/. It will have an expiration date.\n\ttoken: ")
+        token = getpass("Enter token. If you don't have a token, get one from https://urs.earthdata.nasa.gov/. It will have an expiration date.\n\ttoken (your input will be hidden): ")
         session.headers = {"Authorization": f"Bearer {token}"}
 
         for file_name in file_name_list:
