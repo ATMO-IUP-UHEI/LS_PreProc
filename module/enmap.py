@@ -11,9 +11,15 @@ import rasterio
 import matplotlib.pyplot as plt
 
 def main():
-    tar_gz_file = os.path.join(
-        "/Users/leonie/phd/RemoTeC/data/scenarios/enmap/turkmenistan/RAW/dims_op_oc_oc-en_700632974_1.tar.gz")
+    tar_gz_file = os.path.join("/home/lscheidw/phd/RemoTeC_LS/data/tmp_preproc/l1b/enmap/dims_op_oc_oc-en_700632974_1.tar.gz")
+    metadata, swir_band_data, vnir_band_data = get_data(tar_gz_file)
 
+    read_spectrum(metadata, vnir_band_data, "vnir")
+    read_spectrum(metadata, swir_band_data, "swir")
+
+
+
+def get_data(tar_gz_file):
     tar = tarfile.open(tar_gz_file)
 
     for content in tar:
@@ -45,15 +51,17 @@ def main():
             vnir_band_data = xr.open_dataset(vnir_band_data, engine="rasterio")
             continue
 
-    xmlstr = ET.tostring(metadata.getroot(), encoding="utf8", method="xml").decode("utf8")
+    #xmlstr = ET.tostring(metadata.getroot(), encoding="utf8", method="xml").decode("utf8")
 
-    #read_spectrum(metadata, vnir_band_data, "vnir")
-    read_spectrum(metadata, swir_band_data, "swir")
+    return metadata, swir_band_data, vnir_band_data
 
 
 
 def read_spectrum(metadata, band_data, spectral_domain):
     wavelength, fwhm, gain, offset = read_metadata(metadata, spectral_domain)
+    plt.plot(wavelength, gain)
+    plt.show()
+    sys.exit()
 
     #plt.title(f"wavelength pixels {spectral_domain}")
     #plt.xlabel(f"pixel id {spectral_domain}")
@@ -67,6 +75,10 @@ def read_spectrum(metadata, band_data, spectral_domain):
 
     band_data["band_data"] = band_data["band_data"][...] * gain[None, None, :] + offset[None, None, :] * 1e+3
     band_data = band_data.rename({"band_data": "radiance"})
+
+    print(band_data)
+
+    return
 
     if spectral_domain == "swir":
         fig, ax = plt.subplots()
@@ -121,6 +133,7 @@ def read_metadata(metadata, spectral_domain):
         except:
             pass
 
+    # Filter spectral domain
     if spectral_domain == "vnir":
         wavelength = np.asarray(wavelength[:nbands])
         fwhm = np.asarray(fwhm[:nbands])
