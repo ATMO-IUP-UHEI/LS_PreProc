@@ -3,7 +3,6 @@ import zipfile
 from io import BytesIO
 import xarray as xr
 import numpy as np
-import matplotlib.pyplot as plt
 import sys
 
 
@@ -92,11 +91,15 @@ def main():
         + f" Raw files used:  PRS_L1_STD_OFFL_{id}_0001.zip" \
         + f" and PRS_L2B_STD_{id}_0001.zip"
 
-    prisma_data.to_netcdf("L1B_prisma.nc", mode="w", format="NETCDF4")
-    band1_data.to_netcdf("L1B_prisma.nc", mode="a", format="NETCDF4",
-                         group="BAND01")
-    band2_data.to_netcdf("L1B_prisma.nc", mode="a", format="NETCDF4",
-                         group="BAND02")
+    prisma_data.to_netcdf(
+        "L1B_prisma.nc", mode="w", format="NETCDF4"
+    )
+    band1_data.to_netcdf(
+        "L1B_prisma.nc", mode="a", format="NETCDF4", group="BAND01"
+    )
+    band2_data.to_netcdf(
+        "L1B_prisma.nc", mode="a", format="NETCDF4", group="BAND02"
+    )
 
     return 0
 
