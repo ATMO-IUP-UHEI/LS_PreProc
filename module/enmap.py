@@ -1,46 +1,135 @@
-import os
-import sys
 import tarfile
 import zipfile
 from io import BytesIO
 import xml.etree.ElementTree as ET
 import numpy as np
 import xarray as xr
-import rasterio
+import sys
 
-import matplotlib.pyplot as plt
 
 def main():
-    tar_gz_file = os.path.join("/home/lscheidw/phd/RemoTeC_LS/data/tmp_preproc/l1b/enmap/dims_op_oc_oc-en_700632974_1.tar.gz")
-    metadata, swir_band_data, vnir_band_data = get_data(tar_gz_file)
+    path = "/home/lscheidw/phd/RemoTeC_LS/data/tmp_preproc/l1b/enmap"
+    id = "dims_op_oc_oc-en_700632974_1"
 
-    read_spectrum(metadata, vnir_band_data, "vnir")
-    read_spectrum(metadata, swir_band_data, "swir")
+    meta, vnir, swir = get_data(f"{path}/{id}.tar.gz")
+
+    temporal = "sample"
+    spatial = "line"
+    spectral = "band"
+    dims_1d = (spectral)
+    # dims_2d = (temporal, spectral), is handled by get_var routines
+    dims_3d = (temporal, spatial, spectral)
+
+    enmap_data = xr.Dataset()
+
+    enmap_data["latitude"] = get_latitude(meta)
+    enmap_data.latitude.attrs["standard_name"] = "Latitude at pixel center"
+    enmap_data.latitude.attrs["units"] = "degrees north"
+
+    enmap_data["longitude"] = get_longitude(meta)
+    enmap_data.longitude.attrs["standard_name"] = "Longitude at pixel center"
+    enmap_data.longitude.attrs["units"] = "degrees east"
+
+    enmap_data["sza"] = get_sza(meta)
+    enmap_data.sza.attrs["standard_name"] = "Solar Zenith Angle"
+    enmap_data.sza.attrs["units"] = "degrees"
+
+    enmap_data["saa"] = get_saa(meta)
+    enmap_data.saa.attrs["standard_name"] = "Solar Azimuth Angle"
+    enmap_data.saa.attrs["units"] = "degrees"
+
+    enmap_data["vza"] = get_vza(meta)
+    enmap_data.vza.attrs["standard_name"] = "Viewing Zenith Angle"
+    enmap_data.vza.attrs["units"] = "degrees"
+
+    enmap_data["vaa"] = get_vaa(meta)
+    enmap_data.vaa.attrs["standard_name"] = "Viewing Azimuth Angle"
+    enmap_data.vaa.attrs["units"] = "degrees"
+
+    print("TODO LS: Get time.")
+
+    print("TODO LS: Maybe get surface elevation?")
+
+    band1_data = xr.Dataset()
+
+    wavelength, radiance, radiance_noise = get_spectrum(meta, swir, "swir")
+
+    band1_data["wavelength"] = (dims_1d, wavelength)
+    band1_data.wavelength.attrs["standard_name"] = "Wavelength"
+    band1_data.wavelength.attrs["units"] = "nm"
+
+    band1_data["radiance"] = (dims_3d, radiance)
+    band1_data.radiance.attrs["standard_name"] = "At-sensor radiance"
+    band1_data.radiance.attrs["units"] = "photons s-1 cm-2 sr-1 nm-1"
+
+    band1_data["radiance_noise"] = (dims_3d, radiance_noise)
+    band1_data.radiance_noise.attrs["standard_name"] = \
+        "Noise of at-sensor radiance"
+    band1_data.radiance_noise.attrs["units"] = "photons s-1 cm-2 sr-1 nm-1"
+
+    band2_data = xr.Dataset()
+
+    wavelength, radiance, radiance_noise = get_spectrum(meta, vnir, "vnir")
+
+    band2_data["wavelength"] = (dims_1d, wavelength)
+    band2_data.wavelength.attrs["standard_name"] = "Wavelength"
+    band2_data.wavelength.attrs["units"] = "nm"
+
+    band2_data["radiance"] = (dims_3d, radiance)
+    band2_data.radiance.attrs["standard_name"] = "At-sensor radiance"
+    band2_data.radiance.attrs["units"] = "photons s-1 cm-2 sr-1 nm-1"
+
+    band2_data["radiance_noise"] = (dims_3d, radiance_noise)
+    band2_data.radiance_noise.attrs["standard_name"] = \
+        "Noise of at-sensor radiance"
+    band2_data.radiance_noise.attrs["units"] = "photons s-1 cm-2 sr-1 nm-1"
+
+    for var in enmap_data.data_vars:
+        enmap_data[var].encoding.update({"_FillValue": None})
+    for var in band1_data.data_vars:
+        band1_data[var].encoding.update({"_FillValue": None})
+    for var in band2_data.data_vars:
+        band2_data[var].encoding.update({"_FillValue": None})
+
+    enmap_data.attrs["history"] = \
+        "Created using the L1B proprocessor for RemoTeC for EnMAP data."\
+        + f"Raw file used: {id}.tar.gz"
+
+    enmap_data.to_netcdf(
+        "L1B_enmap.nc", mode="w", format="NETCDF4"
+    )
+    band1_data.to_netcdf(
+        "L1B_enmap.nc", mode="a", format="NETCDF4", group="BAND01"
+    )
+    band2_data.to_netcdf(
+        "L1B_enmap.nc", mode="a", format="NETCDF4", group="BAND02"
+    )
 
 
-
-def get_data(tar_gz_file):
-    tar = tarfile.open(tar_gz_file)
+def get_data(tar_gz_file_path):
+    tar = tarfile.open(tar_gz_file_path)
 
     for content in tar:
         # Find measurement. It is contained in the only zip file in the archive
         if not content.name.endswith(".ZIP"):
             continue
 
-        # Get the zip file as a binary string and put it into memory, acting as if it were a file.
+        # Get the zip file as a binary string and put it into memory,
+        # acting as if it were a file.
         f = tar.extractfile(content)
         content = BytesIO(f.read())
         break
 
-    # open the zip file which was previously inside of the tar gz file
+    # Open the .zip file which was previously inside of the .tar.gz file
     zip = zipfile.ZipFile(content)
     for member in zip.namelist():
-        # get metadata and spectral information from the desired channel(s)
-        # they are contained in an xml file and tif file(s).
-        # get them from the zip file and put into memory, acting as if they were files.
+        # Get metadata and spectral information from the desired channel(s).
+        # They are contained in an .xml file and .tif file(s).
+        # Get them from the .zip file and put into memory, acting as if they
+        # were files.
         if "METADATA" in member and member.endswith(".XML"):
             metadata = BytesIO(zip.open(member).read())
-            metadata = ET.parse(metadata)
+            metadata = ET.parse(metadata).getroot()
             continue
         if "SPECTRAL_IMAGE_SWIR" in member and member.endswith(".TIF"):
             swir_band_data = BytesIO(zip.open(member).read())
@@ -51,102 +140,209 @@ def get_data(tar_gz_file):
             vnir_band_data = xr.open_dataset(vnir_band_data, engine="rasterio")
             continue
 
-    #xmlstr = ET.tostring(metadata.getroot(), encoding="utf8", method="xml").decode("utf8")
-
-    return metadata, swir_band_data, vnir_band_data
+    return metadata, vnir_band_data, swir_band_data
 
 
+def get_latitude(meta):
+    latitude_path = "./base/spatialCoverage/boundingPolygon/point/latitude"
+    upper_left, lower_left, lower_right, upper_right = \
+        get_pointinfo_corners(meta, latitude_path)
 
-def read_spectrum(metadata, band_data, spectral_domain):
-    wavelength, fwhm, gain, offset = read_metadata(metadata, spectral_domain)
-    plt.plot(wavelength, gain)
-    plt.show()
-    sys.exit()
+    latitude = interpolate_corners_to_grid(
+        meta, upper_left, lower_left, lower_right, upper_right
+    )
 
-    #plt.title(f"wavelength pixels {spectral_domain}")
-    #plt.xlabel(f"pixel id {spectral_domain}")
-    #plt.ylabel("wavelength / nm")
-    #plt.scatter(range(len(wavelength)), wavelength, marker=".")
-    #plt.show()
+    return latitude
 
-    print("WARN: not sure if lines and samples are swapped.")
-    band_data = band_data.rename({"x": "lines", "y": "samples", "band": "bands"})
-    band_data = band_data.transpose("samples", "lines", "bands")
 
-    band_data["band_data"] = band_data["band_data"][...] * gain[None, None, :] + offset[None, None, :] * 1e+3
-    band_data = band_data.rename({"band_data": "radiance"})
+def get_longitude(meta):
+    longitude_path = "./base/spatialCoverage/boundingPolygon/point/longitude"
+    upper_left, lower_left, lower_right, upper_right = \
+        get_pointinfo_corners(meta, longitude_path)
 
-    print(band_data)
+    longitude = interpolate_corners_to_grid(
+        meta, upper_left, lower_left, lower_right, upper_right
+    )
 
-    return
+    return longitude
 
+
+def get_sza(meta):
+    sza_path = "./specific/sunElevationAngle"
+    upper_left, lower_left, lower_right, upper_right = \
+        get_angle_corners(meta, sza_path)
+
+    sza = interpolate_corners_to_grid(
+        meta, upper_left, lower_left, lower_right, upper_right
+    )
+
+    sza = 90 - sza
+
+    return sza
+
+
+def get_saa(meta):
+    saa_path = "./specific/sunAzimuthAngle"
+    upper_left, lower_left, lower_right, upper_right = \
+        get_angle_corners(meta, saa_path)
+
+    saa = interpolate_corners_to_grid(
+        meta, upper_left, lower_left, lower_right, upper_right
+    )
+
+    return saa
+
+
+def get_vza(meta):
+    vza_path = "./specific/acrossOffNadirAngle"
+    upper_left, lower_left, lower_right, upper_right = \
+        get_angle_corners(meta, vza_path)
+
+    vza = interpolate_corners_to_grid(
+        meta, upper_left, lower_left, lower_right, upper_right
+    )
+
+    return vza
+
+
+def get_vaa(meta):
+    vaa_path = "./specific/sceneAzimuthAngle"
+    upper_left, lower_left, lower_right, upper_right = \
+        get_angle_corners(meta, vaa_path)
+
+    vaa = interpolate_corners_to_grid(
+        meta, upper_left, lower_left, lower_right, upper_right
+    )
+
+    return vaa
+
+
+def get_pointinfo_corners(meta, pointinfo_path):
+    corners = meta.findall(pointinfo_path)
+
+    upper_left = float(corners[0].text)
+    lower_left = float(corners[1].text)
+    lower_right = float(corners[2].text)
+    upper_right = float(corners[3].text)
+
+    return upper_left, lower_left, lower_right, upper_right
+
+
+def get_angle_corners(meta, angle_path):
+    upper_left = float(
+        meta.find(f"{angle_path}/upper_left").text
+    )
+    lower_left = float(
+        meta.find(f"{angle_path}/lower_left").text
+    )
+    lower_right = float(
+        meta.find(f"{angle_path}/lower_right").text
+    )
+    upper_right = float(
+        meta.find(f"{angle_path}/upper_right").text
+    )
+    return upper_left, lower_left, lower_right, upper_right
+
+
+def interpolate_corners_to_grid(
+        meta, upper_left, lower_left, lower_right, upper_right):
+    Ntemporal = int(meta.find("./specific/heightOfScene").text)
+    Nspatial = int(meta.find("./specific/widthOfScene").text)
+
+    da = xr.DataArray(
+        data=[[lower_left, upper_left],
+              [lower_right, upper_right]],
+        dims=("x", "y"),
+        coords={"x": [0, Nspatial - 1], "y": [0, Ntemporal - 1]},
+    )
+
+    da = da.interp(
+        x=np.linspace(0, Nspatial - 1, Nspatial),
+        y=np.linspace(0, Ntemporal - 1, Ntemporal)
+    )
+
+    da = da.rename({"x": "spatial", "y": "temporal"})
+    da = da.drop(["spatial", "temporal"])
+    da = da.transpose("temporal", "spatial")
+
+    return da
+
+
+def get_spectrum(meta, l1b, spectral_domain):
+    # bandIDs contain VNIR bands first, SWIR bands second.
+    # Nswir can be analogously gathered from the metadata, but this script
+    # just checks if the bandID is larger that Nvnir to see if the data is
+    # in the SWIR range.
+    Nvnir = int(meta.find("./specific/numberOfVNIRBands").text)
+
+    # get wavelength in nm
+    wavelength = np.array([])
+    fwhm = np.array([])
+    gain = np.array([])
+    offset = np.array([])
+    for band in meta.findall("./specific/bandCharacterisation/bandID"):
+        # only first Nvnir bands contain information relevant for vnir spectral
+        # domain
+        if spectral_domain == "vnir" and float(band.attrib["number"]) > Nvnir:
+            break
+        # only last Nswir bands contain information relevant for swir spectral
+        # domain
+        if spectral_domain == "swir" and float(band.attrib["number"]) <= Nvnir:
+            continue
+        wavelength = np.append(
+            wavelength, float(band.find("wavelengthCenterOfBand").text)
+        )
+        fwhm = np.append(
+            fwhm, float(band.find("FWHMOfBand").text)
+        )
+        gain = np.append(
+            gain, float(band.find("GainOfBand").text)
+        )
+        offset = np.append(
+            offset, float(band.find("OffsetOfBand").text)
+        )
+
+    digital_number = np.array(
+        l1b.band_data
+    )
+
+    # Calculate radiance using EnMAP product specification p.14
+    # It doesn't say in what way the gain and offset have to be applied to the
+    # digital signal, but I am following along with Luis Guanter's read
+    # routine.
+    # Furthermore, Section 4 mentions a background value, not sure what that
+    # is for.
+    # radiance in W m-2 sr-1 nm-1
+    radiance = \
+        digital_number[:, :, :] * gain[:, None, None] + offset[:, None, None]
+
+    # (spectral, temporal, spatial) -> (temporal, spatial, spectral)
+    radiance = np.moveaxis(radiance, [0, 1, 2], [2, 0, 1])
+
+    # Get radiance noise with dimension (temporal, spatial, spectral)
+    # Calculate radiance noise using SNR provided in EnMAP Instrument
+    # Specification
     if spectral_domain == "swir":
-        fig, ax = plt.subplots()
-        ax.set_title(f"example SWIR spectrum")
-        ax.set_xlabel("wavelength / nm")
-        ax.set_ylabel("radiance")
-        ax.scatter(wavelength, band_data["radiance"][200, 200, :], marker=".", color="black")
-        ax.axvspan(1982, 2092, color="blue", alpha=0.25, label="CO$_2$ fit range")
-        ax.axvspan(2110, 2450, color="red", alpha=0.25, label="CH$_4$ fit range")
-        plt.legend(loc="upper right")
+        snr = 150/1
+    elif spectral_domain == "vnir":
+        snr = 500/1
+    else:
+        sys.exit("invalid spectral domain")
+    radiance_noise = radiance / snr
 
-        zoomed = True
-        if zoomed:
-            ax.set_xlim(1970, 2462)
-            plt.savefig("example_swir_spectrum_zoomed.png", dpi=600)
-        else:
-            plt.savefig("example_swir_spectrum.png", dpi=600)
+    # convert units
+    # radiance, radiance_noise
+    # W m-2 sr-1 nm-1 -> photons s-1 cm-2 sr-1 nm-1
+    planck_constant = 6.62607015e-34  # J s
+    light_speed = 299792458  # m s-1
+    radiance = \
+        radiance * 1e-4 * wavelength * 1e-9 \
+        / planck_constant / light_speed
+    radiance_noise = \
+        radiance_noise * 1e-4 * wavelength * 1e-9 \
+        / planck_constant / light_speed
 
-        plt.show()
-
-    # print("################################################################################")
-    # print(spectral_domain)
-    # print(wavelength)
-    # print(f"xml file: {len(wavelength)}")
-    # print(f"tif file: {band_data.dims['bands']}")
-    # print("################################################################################")
-
-    return
-
-
-
-def read_metadata(metadata, spectral_domain):
-    # Get valid spectral bands for the desired spectral domain
-    for band in metadata.iter(f"{spectral_domain}ProductQuality"):
-        try:
-            nbands = int(band.find("numChannelsExpected").text)
-        except:
-            pass
-
-    wavelength = []
-    fwhm = []
-    gain = []
-    offset = []
-
-    # Get calibration data for all bands
-    for band in metadata.iter("bandID"):
-        try:
-            wavelength.append(float(band.find("wavelengthCenterOfBand").text))
-            fwhm.append(float(band.find("FWHMOfBand").text))
-            gain.append(float(band.find("GainOfBand").text))
-            offset.append(float(band.find("OffsetOfBand").text))
-        except:
-            pass
-
-    # Filter spectral domain
-    if spectral_domain == "vnir":
-        wavelength = np.asarray(wavelength[:nbands])
-        fwhm = np.asarray(fwhm[:nbands])
-        gain = np.asarray(gain[:nbands])
-        offset = np.asarray(offset[:nbands])
-    elif spectral_domain == "swir":
-        wavelength = np.asarray(wavelength[-nbands:])
-        fwhm = np.asarray(fwhm[-nbands:])
-        gain = np.asarray(gain[-nbands:])
-        offset = np.asarray(offset[-nbands:])
-
-    return wavelength, fwhm, gain, offset
-
+    return wavelength, radiance, radiance_noise
 
 
 if __name__ == "__main__":

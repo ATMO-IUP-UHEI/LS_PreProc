@@ -101,8 +101,6 @@ def main():
         "L1B_prisma.nc", mode="a", format="NETCDF4", group="BAND02"
     )
 
-    return 0
-
 
 def get_data(zip_file_path):
     zip_contents = zipfile.ZipFile(zip_file_path)
@@ -167,20 +165,20 @@ def get_datetime(l1b):
     return [start_time, stop_time]
 
 
-def get_spectrum(l1b, spectral_range):
+def get_spectrum(l1b, spectral_domain):
     # get wavelength with dimension (spectral)
     # wavelength in nm
     wavelength = np.array(
-        l1b.attrs[f"List_Cw_{spectral_range.capitalize()}"]
+        l1b.attrs[f"List_Cw_{spectral_domain.capitalize()}"]
     )
 
     # get radiance
     digital_number = np.array(
         l1b["/HDFEOS/SWATHS/PRS_L1_HCO/Data Fields/"
-            + f"{spectral_range.upper()}_Cube"]
+            + f"{spectral_domain.upper()}_Cube"]
     )
-    scale_factor = l1b.attrs[f"ScaleFactor_{spectral_range.capitalize()}"]
-    offset = l1b.attrs[f"Offset_{spectral_range.capitalize()}"]
+    scale_factor = l1b.attrs[f"ScaleFactor_{spectral_domain.capitalize()}"]
+    offset = l1b.attrs[f"Offset_{spectral_domain.capitalize()}"]
 
     # calculate radiance using PRISMA product specification p.107
     # radiance in W m-2 sr-1 um-1
@@ -189,15 +187,15 @@ def get_spectrum(l1b, spectral_range):
     # (spatial, spectral, temporal) -> (temporal, spatial, spectral)
     radiance = np.moveaxis(radiance, [0, 1, 2], [1, 2, 0])
 
-    # get radiance noise with dimension (temporal, spatial, spectral)
-    # calculate radiance_noise using SNR provided in PRISMA product
+    # Get radiance noise with dimension (temporal, spatial, spectral)
+    # Calculate radiance noise using SNR provided in PRISMA product
     # specification p.15
-    if spectral_range == "swir":
+    if spectral_domain == "swir":
         snr = 100/1
-    elif spectral_range == "vnir":
+    elif spectral_domain == "vnir":
         snr = 200/1
     else:
-        sys.exit("invalid spectral range")
+        sys.exit("invalid spectral domain")
     radiance_noise = radiance / snr
 
     # postprocess
