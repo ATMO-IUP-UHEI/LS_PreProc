@@ -4,39 +4,30 @@ from io import BytesIO
 import xarray as xr
 import numpy as np
 import sys
+import os
 
 
-def main():
-    path = "/home/lscheidw/phd/RemoTeC_LS/data/tmp_preproc/l1b/prisma"
-    id = "20201010072033_20201010072038"
-
-    l1b = get_data(f"{path}/PRS_L1_STD_OFFL_{id}_0001.zip")
-    l2b = get_data(f"{path}/PRS_L2B_STD_{id}_0001.zip")
-
-    temporal = "sample"
-    spatial = "line"
-    spectral = "band"
-    dims_1d = (spectral)
-    dims_2d = (temporal, spatial)
-    dims_3d = (temporal, spatial, spectral)
+def import_data(config, dims):
+    l1b = get_data(os.path.join(config["path"], config["l1b"]))
+    l2b = get_data(os.path.join(config["path"], config["l2b"]))
 
     prisma_data = xr.Dataset()
 
-    prisma_data["latitude"] = (dims_2d, get_latitude(l2b))
-    prisma_data.latitude.attrs["standard_name"] = "Latitude at pixel center"
-    prisma_data.latitude.attrs["units"] = "degrees north"
+    prisma_data["latitude"] = (
+        (dims["y"], dims["x"]), get_latitude(l2b)
+    )
 
-    prisma_data["longitude"] = (dims_2d, get_longitude(l2b))
-    prisma_data.longitude.attrs["standard_name"] = "Longitude at pixel center"
-    prisma_data.longitude.attrs["units"] = "degrees east"
+    prisma_data["longitude"] = (
+        (dims["y"], dims["x"]), get_longitude(l2b)
+    )
 
-    prisma_data["sza"] = (dims_2d, get_sza(l2b))
-    prisma_data.sza.attrs["standard_name"] = "Solar Zenith Angle"
-    prisma_data.sza.attrs["units"] = "degrees"
+    prisma_data["solar_zenith_angle"] = (
+        (dims["y"], dims["x"]), get_sza(l2b)
+    )
 
-    prisma_data["vza"] = (dims_2d, get_vza(l2b))
-    prisma_data.vza.attrs["standard_name"] = "Viewing Zenith Angle"
-    prisma_data.vza.attrs["units"] = "degrees"
+    prisma_data["viewing_zenith_angle"] = (
+        (dims["y"], dims["x"]), get_vza(l2b)
+    )
 
     print("TODO LS: Get time.")
 
@@ -49,57 +40,38 @@ def main():
 
     wavelength, radiance, radiance_noise = get_spectrum(l1b, "swir")
 
-    band1_data["wavelength"] = (dims_1d, wavelength)
-    band1_data.wavelength.attrs["standard_name"] = "Wavelength"
-    band1_data.wavelength.attrs["units"] = "nm"
+    band1_data["wavelength"] = (
+        (dims["z"]), wavelength
+    )
 
-    band1_data["radiance"] = (dims_3d, radiance)
-    band1_data.radiance.attrs["standard_name"] = "At-sensor radiance"
-    band1_data.radiance.attrs["units"] = "photons s-1 cm-2 sr-1 nm-1"
+    band1_data["radiance"] = (
+        (dims["y"], dims["x"], dims["z"]), radiance
+    )
 
-    band1_data["radiance_noise"] = (dims_3d, radiance_noise)
-    band1_data.radiance_noise.attrs["standard_name"] = \
-        "Noise of at-sensor radiance"
-    band1_data.radiance_noise.attrs["units"] = "photons s-1 cm-2 sr-1 nm-1"
+    band1_data["radiance_noise"] = (
+        (dims["y"], dims["x"], dims["z"]), radiance_noise
+    )
 
     band2_data = xr.Dataset()
 
     wavelength, radiance, radiance_noise = get_spectrum(l1b, "vnir")
 
-    band2_data["wavelength"] = (dims_1d, wavelength)
-    band2_data.wavelength.attrs["standard_name"] = "Wavelength"
-    band2_data.wavelength.attrs["units"] = "nm"
-
-    band2_data["radiance"] = (dims_3d, radiance)
-    band2_data.radiance.attrs["standard_name"] = "At-sensor radiance"
-    band2_data.radiance.attrs["units"] = "photons s-1 cm-2 sr-1 nm-1"
-
-    band2_data["radiance_noise"] = (dims_3d, radiance_noise)
-    band2_data.radiance_noise.attrs["standard_name"] = \
-        "Noise of at-sensor radiance"
-    band2_data.radiance_noise.attrs["units"] = "photons s-1 cm-2 sr-1 nm-1"
-
-    for var in prisma_data.data_vars:
-        prisma_data[var].encoding.update({"_FillValue": None})
-    for var in band1_data.data_vars:
-        band1_data[var].encoding.update({"_FillValue": None})
-    for var in band2_data.data_vars:
-        band2_data[var].encoding.update({"_FillValue": None})
-
-    prisma_data.attrs["history"] = \
-        "Created using the L1B preprocessor for RemoTeC for PRISMA data."\
-        + f" Raw files used:  PRS_L1_STD_OFFL_{id}_0001.zip" \
-        + f" and PRS_L2B_STD_{id}_0001.zip"
-
-    prisma_data.to_netcdf(
-        "L1B_prisma.nc", mode="w", format="NETCDF4"
+    band2_data["wavelength"] = (
+        (dims["z"]), wavelength
     )
-    band1_data.to_netcdf(
-        "L1B_prisma.nc", mode="a", format="NETCDF4", group="BAND01"
+
+    band2_data["radiance"] = (
+        (dims["y"], dims["x"], dims["z"]), radiance
     )
-    band2_data.to_netcdf(
-        "L1B_prisma.nc", mode="a", format="NETCDF4", group="BAND02"
+
+    band2_data["radiance_noise"] = (
+        (dims["y"], dims["x"], dims["z"]), radiance_noise
     )
+
+    band_list = [band1_data, band2_data]
+    input_file_list = [config["l1b"], config["l2b"]]
+
+    return prisma_data, band_list, input_file_list
 
 
 def get_data(zip_file_path):
@@ -228,7 +200,3 @@ def get_spectrum(l1b, spectral_domain):
         / planck_constant / light_speed
 
     return wavelength, radiance, radiance_noise
-
-
-if __name__ == "__main__":
-    main()

@@ -1,0 +1,131 @@
+import numpy as np
+import xarray as xr
+import os
+
+
+def import_data(config, dims):
+    input_data = xr.open_dataset(os.path.join(config["path"], config["l1b"]))
+
+    dlr_hyspex_data = xr.Dataset()
+
+    dlr_hyspex_data["latitude"] = (
+        (dims["y"], dims["x"]), get_latitude(input_data)
+    )
+
+    dlr_hyspex_data["longitude"] = (
+        (dims["y"], dims["x"]), get_longitude(input_data)
+    )
+
+    dlr_hyspex_data["solar_zenith_angle"] = (
+        (dims["y"], dims["x"]), get_sza(input_data)
+    )
+
+    dlr_hyspex_data["solar_azimuth_angle"] = (
+        (dims["y"], dims["x"]), get_saa(input_data)
+    )
+
+    dlr_hyspex_data["viewing_zenith_angle"] = (
+        (dims["y"], dims["x"]), get_vza(input_data)
+    )
+
+    dlr_hyspex_data["viewing_azimuth_angle"] = (
+        (dims["y"], dims["x"]), get_vaa(input_data)
+    )
+
+    dlr_hyspex_data["observer_altitude"] = (
+        (dims["y"], dims["x"]), get_z(input_data)
+    )
+
+    band1_data = xr.Dataset()
+
+    wavelength, radiance, radiance_noise = get_spectrum(input_data)
+
+    band1_data["wavelength"] = (
+        (dims["z"]), wavelength
+    )
+
+    band1_data["radiance"] = (
+        (dims["y"], dims["x"], dims["z"]), radiance
+    )
+
+    band1_data["radiance_noise"] = (
+        (dims["y"], dims["x"], dims["z"]), radiance_noise
+    )
+
+    print("TODO LS: Read time data.")
+
+    print("TODO LS: Maybe read surface elevation data?")
+
+    band_list = [band1_data]
+    input_file_list = [config["l1b"]]
+
+    return dlr_hyspex_data, band_list, input_file_list
+
+
+def get_latitude(input_data):
+    return input_data.pixel_center_lat.values
+
+
+def get_longitude(input_data):
+    return input_data.pixel_center_lon.values
+
+
+def get_sza(input_data):
+    # sza is only provided along time axis.
+    # RemoTeC needs it for each pixel. Copy the values along the spatial axis.
+    Ntemporal = len(input_data.time)
+    Nspatial = len(input_data.across_track_pixel_index)
+    sza = np.array(input_data.solar_zenith_ang.values)
+    sza = np.broadcast_to(sza, shape=(Nspatial, Ntemporal)).transpose()
+    return sza
+
+
+def get_saa(input_data):
+    # saa is only provided along time axis.
+    # RemoTeC needs it for each pixel. Copy the values along the spatial axis.
+    Ntemporal = len(input_data.time)
+    Nspatial = len(input_data.across_track_pixel_index)
+    saa = np.array(input_data.solar_azimuth_ang.values)
+    saa = np.broadcast_to(saa, shape=(Nspatial, Ntemporal)).transpose()
+    return saa
+
+
+def get_vza(input_data):
+    return input_data.pixel_zenith_ang.values
+
+
+def get_vaa(input_data):
+    return input_data.pixel_azimuth_ang.values
+
+
+def get_z(input_data):
+    # height above reference ellipsoid
+    hae = input_data.sensor_height
+    # surface height above reference ellipsoid
+    sfc = input_data.pixel_center_height
+    # sensor height above surface
+    z = hae - sfc
+    return z.values
+
+
+def get_spectrum(input_data):
+    # Wavelength in nm
+    wavelength = input_data.wavelength.values
+
+    # Radiance in mW m-2 sr-1 nm-1
+    radiance = input_data.radiance.values
+
+    # Convert units
+    # mW m-2 sr-1 nm-1 -> photons s-1 cm-2 sr-1 nm-1
+    planck_constant = 6.62607015e-34  # J s
+    light_speed = 299792458  # m s-1
+    radiance = \
+        radiance * 1e-4 * wavelength * 1e-9 \
+        / planck_constant / light_speed
+
+    # Calculate radiance noise from radiance using signal-to-noise ratio
+    print("TODO LS: I AM MAKING UP AN SNR FOR NOW. CHANGE THIS !!!!")
+    snr = 100/1
+    radiance_noise = radiance / snr
+
+    return wavelength, radiance, radiance_noise

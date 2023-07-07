@@ -5,46 +5,37 @@ import xml.etree.ElementTree as ET
 import numpy as np
 import xarray as xr
 import sys
+import os
 
 
-def main():
-    path = "/home/lscheidw/phd/RemoTeC_LS/data/tmp_preproc/l1b/enmap"
-    id = "dims_op_oc_oc-en_700632974_1"
-
-    meta, vnir, swir = get_data(f"{path}/{id}.tar.gz")
-
-    temporal = "sample"
-    spatial = "line"
-    spectral = "band"
-    dims_1d = (spectral)
-    # dims_2d = (temporal, spectral), is handled by get_var routines
-    dims_3d = (temporal, spatial, spectral)
+def import_data(config, dims):
+    meta, vnir, swir = get_data(os.path.join(config["path"], config["tar_gz"]))
 
     enmap_data = xr.Dataset()
 
-    enmap_data["latitude"] = get_latitude(meta)
-    enmap_data.latitude.attrs["standard_name"] = "Latitude at pixel center"
-    enmap_data.latitude.attrs["units"] = "degrees north"
+    enmap_data["latitude"] = (
+            (dims["y"], dims["x"]), get_latitude(meta)
+    )
 
-    enmap_data["longitude"] = get_longitude(meta)
-    enmap_data.longitude.attrs["standard_name"] = "Longitude at pixel center"
-    enmap_data.longitude.attrs["units"] = "degrees east"
+    enmap_data["longitude"] = (
+            (dims["y"], dims["x"]), get_longitude(meta)
+    )
 
-    enmap_data["sza"] = get_sza(meta)
-    enmap_data.sza.attrs["standard_name"] = "Solar Zenith Angle"
-    enmap_data.sza.attrs["units"] = "degrees"
+    enmap_data["solar_zenith_angle"] = (
+            (dims["y"], dims["x"]), get_sza(meta)
+    )
 
-    enmap_data["saa"] = get_saa(meta)
-    enmap_data.saa.attrs["standard_name"] = "Solar Azimuth Angle"
-    enmap_data.saa.attrs["units"] = "degrees"
+    enmap_data["solar_azimuth_angle"] = (
+            (dims["y"], dims["x"]), get_saa(meta)
+    )
 
-    enmap_data["vza"] = get_vza(meta)
-    enmap_data.vza.attrs["standard_name"] = "Viewing Zenith Angle"
-    enmap_data.vza.attrs["units"] = "degrees"
+    enmap_data["viewing_zenith_angle"] = (
+            (dims["y"], dims["x"]), get_vza(meta)
+    )
 
-    enmap_data["vaa"] = get_vaa(meta)
-    enmap_data.vaa.attrs["standard_name"] = "Viewing Azimuth Angle"
-    enmap_data.vaa.attrs["units"] = "degrees"
+    enmap_data["viewing_azimuth_angle"] = (
+            (dims["y"], dims["x"]), get_vaa(meta)
+    )
 
     print("TODO LS: Get time.")
 
@@ -54,56 +45,38 @@ def main():
 
     wavelength, radiance, radiance_noise = get_spectrum(meta, swir, "swir")
 
-    band1_data["wavelength"] = (dims_1d, wavelength)
-    band1_data.wavelength.attrs["standard_name"] = "Wavelength"
-    band1_data.wavelength.attrs["units"] = "nm"
+    band1_data["wavelength"] = (
+        (dims["z"]), wavelength
+    )
 
-    band1_data["radiance"] = (dims_3d, radiance)
-    band1_data.radiance.attrs["standard_name"] = "At-sensor radiance"
-    band1_data.radiance.attrs["units"] = "photons s-1 cm-2 sr-1 nm-1"
+    band1_data["radiance"] = (
+        (dims["y"], dims["x"], dims["z"]), radiance
+    )
 
-    band1_data["radiance_noise"] = (dims_3d, radiance_noise)
-    band1_data.radiance_noise.attrs["standard_name"] = \
-        "Noise of at-sensor radiance"
-    band1_data.radiance_noise.attrs["units"] = "photons s-1 cm-2 sr-1 nm-1"
+    band1_data["radiance_noise"] = (
+        (dims["y"], dims["x"], dims["z"]), radiance_noise
+    )
 
     band2_data = xr.Dataset()
 
     wavelength, radiance, radiance_noise = get_spectrum(meta, vnir, "vnir")
 
-    band2_data["wavelength"] = (dims_1d, wavelength)
-    band2_data.wavelength.attrs["standard_name"] = "Wavelength"
-    band2_data.wavelength.attrs["units"] = "nm"
-
-    band2_data["radiance"] = (dims_3d, radiance)
-    band2_data.radiance.attrs["standard_name"] = "At-sensor radiance"
-    band2_data.radiance.attrs["units"] = "photons s-1 cm-2 sr-1 nm-1"
-
-    band2_data["radiance_noise"] = (dims_3d, radiance_noise)
-    band2_data.radiance_noise.attrs["standard_name"] = \
-        "Noise of at-sensor radiance"
-    band2_data.radiance_noise.attrs["units"] = "photons s-1 cm-2 sr-1 nm-1"
-
-    for var in enmap_data.data_vars:
-        enmap_data[var].encoding.update({"_FillValue": None})
-    for var in band1_data.data_vars:
-        band1_data[var].encoding.update({"_FillValue": None})
-    for var in band2_data.data_vars:
-        band2_data[var].encoding.update({"_FillValue": None})
-
-    enmap_data.attrs["history"] = \
-        "Created using the L1B proprocessor for RemoTeC for EnMAP data."\
-        + f"Raw file used: {id}.tar.gz"
-
-    enmap_data.to_netcdf(
-        "L1B_enmap.nc", mode="w", format="NETCDF4"
+    band2_data["wavelength"] = (
+        (dims["z"]), wavelength
     )
-    band1_data.to_netcdf(
-        "L1B_enmap.nc", mode="a", format="NETCDF4", group="BAND01"
+
+    band2_data["radiance"] = (
+        (dims["y"], dims["x"], dims["z"]), radiance
     )
-    band2_data.to_netcdf(
-        "L1B_enmap.nc", mode="a", format="NETCDF4", group="BAND02"
+
+    band2_data["radiance_noise"] = (
+        (dims["y"], dims["x"], dims["z"]), radiance_noise
     )
+
+    band_list = [band1_data, band2_data]
+    input_file_list = [config["tar_gz"]]
+
+    return enmap_data, band_list, input_file_list
 
 
 def get_data(tar_gz_file_path):
@@ -261,11 +234,9 @@ def interpolate_corners_to_grid(
         y=np.linspace(0, Ntemporal - 1, Ntemporal)
     )
 
-    da = da.rename({"x": "spatial", "y": "temporal"})
-    da = da.drop(["spatial", "temporal"])
-    da = da.transpose("temporal", "spatial")
+    da = da.transpose()
 
-    return da
+    return da.values
 
 
 def get_spectrum(meta, l1b, spectral_domain):
@@ -343,7 +314,3 @@ def get_spectrum(meta, l1b, spectral_domain):
         / planck_constant / light_speed
 
     return wavelength, radiance, radiance_noise
-
-
-if __name__ == "__main__":
-    main()
