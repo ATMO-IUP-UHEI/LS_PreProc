@@ -86,56 +86,56 @@ def get_data(config, dims):
 def set_attributes(root, band_list, dims):
     assert "time" in root.data_vars
     assert root.time.dims == (dims["y"],)
-    root.time.attrs["standard_name"] = \
+    root.time.attrs["long_name"] = \
         "UTC date and time of measurement in ISO 8601 standard"
     root.time.attrs["units"] = \
         "YYYY-MM-DDThh:mm:ssZ"
 
     assert "latitude" in root.data_vars
     assert root.latitude.dims == (dims["y"], dims["x"])
-    root.latitude.attrs["standard_name"] = \
+    root.latitude.attrs["long_name"] = \
         "latitude at pixel center"
     root.latitude.attrs["units"] = \
         "degrees north"
 
     assert "longitude" in root.data_vars
     assert root.longitude.dims == (dims["y"], dims["x"])
-    root.longitude.attrs["standard_name"] = \
+    root.longitude.attrs["long_name"] = \
         "longitude at pixel center"
     root.longitude.attrs["units"] = \
         "degrees east"
 
     assert "solar_zenith_angle" in root.data_vars
     assert root.solar_zenith_angle.dims == (dims["y"], dims["x"])
-    root.solar_zenith_angle.attrs["standard_name"] = \
+    root.solar_zenith_angle.attrs["long_name"] = \
         "solar zenith angle"
     root.solar_zenith_angle.attrs["units"] = \
         "degrees"
 
     if "solar_azimuth_angle" in root.data_vars:
         assert root.solar_azimuth_angle.dims == (dims["y"], dims["x"])
-        root.solar_azimuth_angle.attrs["standard_name"] = \
+        root.solar_azimuth_angle.attrs["long_name"] = \
             "solar azimuth angle"
         root.solar_azimuth_angle.attrs["units"] = \
             "degrees"
 
     assert "viewing_zenith_angle" in root.data_vars
     assert root.viewing_zenith_angle.dims == (dims["y"], dims["x"])
-    root.viewing_zenith_angle.attrs["standard_name"] = \
+    root.viewing_zenith_angle.attrs["long_name"] = \
         "viewing zenith angle"
     root.viewing_zenith_angle.attrs["units"] = \
         "degrees"
 
     if "viewing_azimuth_angle" in root.data_vars:
         assert root.viewing_azimuth_angle.dims == (dims["y"], dims["x"])
-        root.viewing_azimuth_angle.attrs["standard_name"] = \
+        root.viewing_azimuth_angle.attrs["long_name"] = \
             "viewing azimuth angle"
         root.viewing_azimuth_angle.attrs["units"] = \
             "degrees"
 
     if "observer_altitude" in root.data_vars:
         assert root.observer_altitude.dims == (dims["y"], dims["x"])
-        root.observer_altitude.attrs["standard_name"] = \
+        root.observer_altitude.attrs["long_name"] = \
             "observer altitude above ground"
         root.observer_altitude.attrs["units"] = \
             "m"
@@ -146,19 +146,19 @@ def set_attributes(root, band_list, dims):
 
         assert "wavelength" in band.data_vars
         assert band.wavelength.dims == (dims["z"],)
-        band.wavelength.attrs["standard_name"] = "wavelength"
+        band.wavelength.attrs["long_name"] = "wavelength"
         band.wavelength.attrs["units"] = "nm"
 
         assert "radiance" in band.data_vars
         assert band.radiance.dims == (dims["y"], dims["x"], dims["z"])
-        band.radiance.attrs["standard_name"] = \
+        band.radiance.attrs["long_name"] = \
             "at-sensor radiance"
         band.radiance.attrs["units"] = \
             "photons s-1 cm-2 sr-1 nm-1"
 
         assert "radiance_noise" in band.data_vars
         assert band.radiance_noise.dims == (dims["y"], dims["x"], dims["z"])
-        band.radiance_noise.attrs["standard_name"] = \
+        band.radiance_noise.attrs["long_name"] = \
             "noise of at-sensor radiance"
         band.radiance_noise.attrs["units"] = \
             "photons s-1 cm-2 sr-1 nm-1"
@@ -166,7 +166,7 @@ def set_attributes(root, band_list, dims):
         if "radiance_error" in band.data_vars:
             assert band.radiance_error.dims == \
                 (dims["y"], dims["x"], dims["z"])
-            band.radiance_error.attrs["standard_name"] = \
+            band.radiance_error.attrs["long_name"] = \
                 "realization of Gaussian noise added onto synthetic radiance"
             band.radiance_error.attrs["units"] = \
                 "photons s-1 cm-2 sr-1 nm-1"
