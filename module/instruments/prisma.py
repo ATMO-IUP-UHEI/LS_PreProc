@@ -5,13 +5,18 @@ import xarray as xr
 import numpy as np
 import sys
 import os
-
+from datetime import datetime
+from datetime import timedelta
 
 def import_data(config, dims):
     l1b = get_data(os.path.join(config["path"], config["l1b"]))
     l2b = get_data(os.path.join(config["path"], config["l2b"]))
 
     prisma_data = xr.Dataset()
+
+    prisma_data["time"] = (
+        (dims["y"]), get_time(l1b)
+    )
 
     prisma_data["latitude"] = (
         (dims["y"], dims["x"]), get_latitude(l2b)
@@ -28,8 +33,6 @@ def import_data(config, dims):
     prisma_data["viewing_zenith_angle"] = (
         (dims["y"], dims["x"]), get_vza(l2b)
     )
-
-    print("TODO LS: Get time.")
 
     print("TODO LS: Maybe get surface elevation?")
     # for surface elevation maybe check l2 product 8.2.1 HEIGHT_OFF ??
@@ -82,6 +85,34 @@ def get_data(zip_file_path):
     return data
 
 
+def get_time(l1b):
+    # check documentation p.130 at the very bottom. This field should give
+    # the UTC time in MJD2000 Decimal days format, but online converters
+    # get a date in 1987 or something like that. Something seems to be wrong.
+    # Instead, calculate the times for the individual frames using start and
+    # stop times of the measurements and linearly interpolate between all
+    # along-track pixels.
+    # You could get size of (temporal) using the time field and get its size
+    # even if you can't use the values.
+    # time = l1b["/HDFEOS/SWATHS/PRS_L1_HCO/Geolocation Fields/Time"]
+
+    start_time = l1b.attrs["Product_StartTime"].decode("utf-8")
+    stop_time = l1b.attrs["Product_StopTime"].decode("utf-8")
+    start_time = datetime.strptime(start_time, "%Y-%m-%dT%H:%M:%S.%f")
+    stop_time = datetime.strptime(stop_time, "%Y-%m-%dT%H:%M:%S.%f")
+    Ntemporal = len(l1b["/HDFEOS/SWATHS/PRS_L1_HCO/Geolocation Fields/Time"])
+
+    time_diff = timedelta(seconds=(stop_time - start_time).total_seconds())
+
+    time = []
+    for i in range(Ntemporal):
+        timestamp = start_time + i/(Ntemporal - 1) * time_diff
+        time_string = datetime.strftime(timestamp, "%Y-%m-%dT%H:%M:%SZ")
+        time.append(time_string)
+
+    return time
+
+
 def get_latitude(l2b):
     latitude = np.array(
         l2b["/HDFEOS/SWATHS/PRS_L2B_HCO/Geolocation Fields/Latitude"]
@@ -116,25 +147,6 @@ def get_vza(l2b):
     # (spatial, temporal) -> (temporal, spatial)
     vza = np.transpose(vza)
     return vza
-
-
-def get_datetime(l1b):
-    # check documentation p.130 at the very bottom. This field should give
-    # the UTC time in MJD2000 Decimal days format, but online converters
-    # get a date in 1987 or something like that. Something seems to be wrong.
-    # Instead, calculate the times for the individual frames using start and
-    # stop times of the measurements and linearly interpolate between all
-    # along-track pixels.
-    # You could get size of (temporal) using the time field and get its size
-    # even if you can't use the values.
-    # Number of lines see 7.2.2, p.96 of documentation, should be in the data.
-    # time = l1b["/HDFEOS/SWATHS/PRS_L1_HCO/Geolocation Fields/Time"]
-
-    start_time = l1b.attrs["Product_StartTime"]
-    stop_time = l1b.attrs["Product_StopTime"]
-
-    print("TODO LS: Create array with size (temporal).")
-    return [start_time, stop_time]
 
 
 def get_spectrum(l1b, spectral_domain):

@@ -6,12 +6,18 @@ import numpy as np
 import xarray as xr
 import sys
 import os
+from datetime import datetime
+from datetime import timedelta
 
 
 def import_data(config, dims):
     meta, vnir, swir = get_data(os.path.join(config["path"], config["tar_gz"]))
 
     enmap_data = xr.Dataset()
+
+    enmap_data["time"] = (
+        (dims["y"], get_time(meta))
+    )
 
     enmap_data["latitude"] = (
             (dims["y"], dims["x"]), get_latitude(meta)
@@ -36,8 +42,6 @@ def import_data(config, dims):
     enmap_data["viewing_azimuth_angle"] = (
             (dims["y"], dims["x"]), get_vaa(meta)
     )
-
-    print("TODO LS: Get time.")
 
     print("TODO LS: Maybe get surface elevation?")
 
@@ -114,6 +118,24 @@ def get_data(tar_gz_file_path):
             continue
 
     return metadata, vnir_band_data, swir_band_data
+
+
+def get_time(meta):
+    start_time = meta.find("./base/temporalCoverage/startTime").text
+    stop_time = meta.find("./base/temporalCoverage/stopTime").text
+    start_time = datetime.strptime(start_time, "%Y-%m-%dT%H:%M:%S.%fZ")
+    stop_time = datetime.strptime(stop_time, "%Y-%m-%dT%H:%M:%S.%fZ")
+    Ntemporal = int(meta.find("./specific/heightOfScene").text)
+
+    time_diff = timedelta(seconds=(stop_time - start_time).total_seconds())
+
+    time = []
+    for i in range(Ntemporal):
+        timestamp = start_time + i/(Ntemporal - 1) * time_diff
+        time_string = datetime.strftime(timestamp, "%Y-%m-%dT%H:%M:%SZ")
+        time.append(time_string)
+
+    return time
 
 
 def get_latitude(meta):

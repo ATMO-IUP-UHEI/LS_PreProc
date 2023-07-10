@@ -84,6 +84,13 @@ def get_data(config, dims):
 
 
 def set_attributes(root, band_list, dims):
+    assert "time" in root.data_vars
+    assert root.time.dims == (dims["y"],)
+    root.time.attrs["standard_name"] = \
+        "UTC date and time of measurement in ISO 8601 standard"
+    root.time.attrs["units"] = \
+        "YYYY-MM-DDThh:mm:ssZ"
+
     assert "latitude" in root.data_vars
     assert root.latitude.dims == (dims["y"], dims["x"])
     root.latitude.attrs["standard_name"] = \
@@ -126,7 +133,6 @@ def set_attributes(root, band_list, dims):
         root.viewing_azimuth_angle.attrs["units"] = \
             "degrees"
 
-    print("checking")
     if "observer_altitude" in root.data_vars:
         assert root.observer_altitude.dims == (dims["y"], dims["x"])
         root.observer_altitude.attrs["standard_name"] = \

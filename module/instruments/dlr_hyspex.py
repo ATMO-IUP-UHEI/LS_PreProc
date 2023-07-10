@@ -8,6 +8,10 @@ def import_data(config, dims):
 
     dlr_hyspex_data = xr.Dataset()
 
+    dlr_hyspex_data["time"] = (
+        (dims["y"]), get_time(input_data)
+    )
+
     dlr_hyspex_data["latitude"] = (
         (dims["y"], dims["x"]), get_latitude(input_data)
     )
@@ -52,14 +56,19 @@ def import_data(config, dims):
         (dims["y"], dims["x"], dims["z"]), radiance_noise
     )
 
-    print("TODO LS: Read time data.")
-
     print("TODO LS: Maybe read surface elevation data?")
 
     band_list = [band1_data]
     input_file_list = [config["l1b"]]
 
     return dlr_hyspex_data, band_list, input_file_list
+
+
+def get_time(input_data):
+    time = input_data.time.values
+    time = np.array(time, dtype="datetime64[s]")
+    time = [str(x) + "Z" for x in time]
+    return time
 
 
 def get_latitude(input_data):
