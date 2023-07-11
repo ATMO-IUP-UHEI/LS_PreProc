@@ -1,4 +1,5 @@
 import sys
+import configparser
 
 from instruments import prisma
 from instruments import enmap
@@ -6,36 +7,22 @@ from instruments import dlr_hyspex
 
 
 def main():
-    config_prisma = {
-        "instrument":
-            "PRISMA",
-        "path":
-            "/home/lscheidw/phd/RemoTeC_LS/data/tmp_preproc/l1b/prisma",
-        "l1b":
-            "PRS_L1_STD_OFFL_20201010072033_20201010072038_0001.zip",
-        "l2b":
-            "PRS_L2B_STD_20201010072033_20201010072038_0001.zip",
-    }
+    try:
+        config_file = sys.argv[1]
+        config = configparser.ConfigParser()
+        config.read(config_file)
+    except IndexError:
+        sys.exit("Provide settings file as command line argument.")
 
-    config_enmap = {
-        "instrument":
-            "EnMAP",
-        "path":
-            "/home/lscheidw/phd/RemoTeC_LS/data/tmp_preproc/l1b/enmap",
-        "tar_gz":
-            "dims_op_oc_oc-en_700632974_1.tar.gz",
+    dims = get_dims()
+    root, band_list, input_file_list = get_data(config["config"], dims)
+    set_attributes(root, band_list, dims)
+    write_data(config["config"], root, band_list, input_file_list)
 
-    }
+    return
 
-    config_dlr_hyspex = {
-        "instrument":
-            "DLR HySpex",
-        "path":
-            "/home/lscheidw/phd/RemoTeC_LS/data/tmp_preproc/l1b/dlr_hyspex",
-        "l1b":
-            "20180607_Pawlowice_01_SWIR_320me_SN3510_FOVx2_raw.nc",
-    }
 
+def get_dims():
     dims = {
         # across-track spatial dimension
         # These spatial pixels are measured simultaneously for a push-broom
@@ -50,20 +37,7 @@ def main():
         # different wavelengths or wavenumbers, depending on the instrument.
         "z": "channel",
     }
-
-    config_list = [
-        config_prisma,
-        config_enmap,
-        config_dlr_hyspex,
-    ]
-
-    for config in config_list:
-        print(config["instrument"])
-        root, band_list, input_file_list = get_data(config, dims)
-        set_attributes(root, band_list, dims)
-        write_data(config, root, band_list, input_file_list)
-
-    return
+    return dims
 
 
 def get_data(config, dims):
@@ -93,6 +67,7 @@ def set_attributes(root, band_list, dims):
 
     assert "latitude" in root.data_vars
     assert root.latitude.dims == (dims["y"], dims["x"])
+    assert root.latitude.dtype == "float32"
     root.latitude.attrs["long_name"] = \
         "latitude at pixel center"
     root.latitude.attrs["units"] = \
@@ -100,6 +75,7 @@ def set_attributes(root, band_list, dims):
 
     assert "longitude" in root.data_vars
     assert root.longitude.dims == (dims["y"], dims["x"])
+    assert root.longitude.dtype == "float32"
     root.longitude.attrs["long_name"] = \
         "longitude at pixel center"
     root.longitude.attrs["units"] = \
@@ -107,6 +83,7 @@ def set_attributes(root, band_list, dims):
 
     assert "solar_zenith_angle" in root.data_vars
     assert root.solar_zenith_angle.dims == (dims["y"], dims["x"])
+    assert root.solar_zenith_angle.dtype == "float32"
     root.solar_zenith_angle.attrs["long_name"] = \
         "solar zenith angle"
     root.solar_zenith_angle.attrs["units"] = \
@@ -114,6 +91,7 @@ def set_attributes(root, band_list, dims):
 
     if "solar_azimuth_angle" in root.data_vars:
         assert root.solar_azimuth_angle.dims == (dims["y"], dims["x"])
+        assert root.solar_azimuth_angle.dtype == "float32"
         root.solar_azimuth_angle.attrs["long_name"] = \
             "solar azimuth angle"
         root.solar_azimuth_angle.attrs["units"] = \
@@ -121,6 +99,7 @@ def set_attributes(root, band_list, dims):
 
     assert "viewing_zenith_angle" in root.data_vars
     assert root.viewing_zenith_angle.dims == (dims["y"], dims["x"])
+    assert root.viewing_zenith_angle.dtype == "float32"
     root.viewing_zenith_angle.attrs["long_name"] = \
         "viewing zenith angle"
     root.viewing_zenith_angle.attrs["units"] = \
@@ -128,6 +107,7 @@ def set_attributes(root, band_list, dims):
 
     if "viewing_azimuth_angle" in root.data_vars:
         assert root.viewing_azimuth_angle.dims == (dims["y"], dims["x"])
+        assert root.viewing_azimuth_angle.dtype == "float32"
         root.viewing_azimuth_angle.attrs["long_name"] = \
             "viewing azimuth angle"
         root.viewing_azimuth_angle.attrs["units"] = \
@@ -135,6 +115,7 @@ def set_attributes(root, band_list, dims):
 
     if "observer_altitude" in root.data_vars:
         assert root.observer_altitude.dims == (dims["y"], dims["x"])
+        assert root.observer_altitude.dtype == "float32"
         root.observer_altitude.attrs["long_name"] = \
             "observer altitude above ground"
         root.observer_altitude.attrs["units"] = \
@@ -146,11 +127,13 @@ def set_attributes(root, band_list, dims):
 
         assert "wavelength" in band.data_vars
         assert band.wavelength.dims == (dims["z"],)
+        assert band.wavelength.dtype == "float32"
         band.wavelength.attrs["long_name"] = "wavelength"
         band.wavelength.attrs["units"] = "nm"
 
         assert "radiance" in band.data_vars
         assert band.radiance.dims == (dims["y"], dims["x"], dims["z"])
+        assert band.radiance.dtype == "float32"
         band.radiance.attrs["long_name"] = \
             "at-sensor radiance"
         band.radiance.attrs["units"] = \
@@ -158,6 +141,7 @@ def set_attributes(root, band_list, dims):
 
         assert "radiance_noise" in band.data_vars
         assert band.radiance_noise.dims == (dims["y"], dims["x"], dims["z"])
+        assert band.radiance_noise.dtype == "float32"
         band.radiance_noise.attrs["long_name"] = \
             "noise of at-sensor radiance"
         band.radiance_noise.attrs["units"] = \
@@ -166,6 +150,7 @@ def set_attributes(root, band_list, dims):
         if "radiance_error" in band.data_vars:
             assert band.radiance_error.dims == \
                 (dims["y"], dims["x"], dims["z"])
+            assert band.radiance_error.dtype == "float32"
             band.radiance_error.attrs["long_name"] = \
                 "realization of Gaussian noise added onto synthetic radiance"
             band.radiance_error.attrs["units"] = \

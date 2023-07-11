@@ -8,31 +8,37 @@ import os
 from datetime import datetime
 from datetime import timedelta
 
+
 def import_data(config, dims):
     l1b = get_data(os.path.join(config["path"], config["l1b"]))
     l2b = get_data(os.path.join(config["path"], config["l2b"]))
 
     prisma_data = xr.Dataset()
 
-    prisma_data["time"] = (
-        (dims["y"]), get_time(l1b)
+    prisma_data["time"] = xr.DataArray(
+        data=get_time(l1b),
+        dims=(dims["y"]),
     )
 
-    prisma_data["latitude"] = (
-        (dims["y"], dims["x"]), get_latitude(l2b)
-    )
+    prisma_data["latitude"] = xr.DataArray(
+        data=get_latitude(l2b),
+        dims=(dims["y"], dims["x"]),
+    ).astype("float32")
 
-    prisma_data["longitude"] = (
-        (dims["y"], dims["x"]), get_longitude(l2b)
-    )
+    prisma_data["longitude"] = xr.DataArray(
+        data=get_longitude(l2b),
+        dims=(dims["y"], dims["x"]),
+    ).astype("float32")
 
-    prisma_data["solar_zenith_angle"] = (
-        (dims["y"], dims["x"]), get_sza(l2b)
-    )
+    prisma_data["solar_zenith_angle"] = xr.DataArray(
+        data=get_sza(l2b),
+        dims=(dims["y"], dims["x"]),
+    ).astype("float32")
 
-    prisma_data["viewing_zenith_angle"] = (
-        (dims["y"], dims["x"]), get_vza(l2b)
-    )
+    prisma_data["viewing_zenith_angle"] = xr.DataArray(
+        data=get_vza(l2b),
+        dims=(dims["y"], dims["x"]),
+    ).astype("float32")
 
     print("TODO LS: Maybe get surface elevation?")
     # for surface elevation maybe check l2 product 8.2.1 HEIGHT_OFF ??
@@ -43,33 +49,39 @@ def import_data(config, dims):
 
     wavelength, radiance, radiance_noise = get_spectrum(l1b, "swir")
 
-    band1_data["wavelength"] = (
-        (dims["z"]), wavelength
-    )
+    band1_data["wavelength"] = xr.DataArray(
+        data=wavelength,
+        dims=(dims["z"]),
+    ).astype("float32")
 
-    band1_data["radiance"] = (
-        (dims["y"], dims["x"], dims["z"]), radiance
-    )
+    band1_data["radiance"] = xr.DataArray(
+        data=radiance,
+        dims=(dims["y"], dims["x"], dims["z"]),
+    ).astype("float32")
 
-    band1_data["radiance_noise"] = (
-        (dims["y"], dims["x"], dims["z"]), radiance_noise
-    )
+    band1_data["radiance_noise"] = xr.DataArray(
+        data=radiance_noise,
+        dims=(dims["y"], dims["x"], dims["z"]),
+    ).astype("float32")
 
     band2_data = xr.Dataset()
 
     wavelength, radiance, radiance_noise = get_spectrum(l1b, "vnir")
 
-    band2_data["wavelength"] = (
-        (dims["z"]), wavelength
-    )
+    band2_data["wavelength"] = xr.DataArray(
+        data=wavelength,
+        dims=(dims["z"]),
+    ).astype("float32")
 
-    band2_data["radiance"] = (
-        (dims["y"], dims["x"], dims["z"]), radiance
-    )
+    band2_data["radiance"] = xr.DataArray(
+        data=radiance,
+        dims=(dims["y"], dims["x"], dims["z"]),
+    ).astype("float32")
 
-    band2_data["radiance_noise"] = (
-        (dims["y"], dims["x"], dims["z"]), radiance_noise
-    )
+    band2_data["radiance_noise"] = xr.DataArray(
+        data=radiance_noise,
+        dims=(dims["y"], dims["x"], dims["z"]),
+    ).astype("float32")
 
     band_list = [band1_data, band2_data]
     input_file_list = [config["l1b"], config["l2b"]]

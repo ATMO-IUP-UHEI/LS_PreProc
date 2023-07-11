@@ -8,53 +8,64 @@ def import_data(config, dims):
 
     dlr_hyspex_data = xr.Dataset()
 
-    dlr_hyspex_data["time"] = (
-        (dims["y"]), get_time(input_data)
+    dlr_hyspex_data["time"] = xr.DataArray(
+        data=get_time(input_data),
+        dims=(dims["y"]),
     )
 
-    dlr_hyspex_data["latitude"] = (
-        (dims["y"], dims["x"]), get_latitude(input_data)
-    )
+    dlr_hyspex_data["latitude"] = xr.DataArray(
+        data=get_latitude(input_data),
+        dims=(dims["y"], dims["x"]),
+    ).astype("float32")
 
-    dlr_hyspex_data["longitude"] = (
-        (dims["y"], dims["x"]), get_longitude(input_data)
-    )
+    dlr_hyspex_data["longitude"] = xr.DataArray(
+        data=get_longitude(input_data),
+        dims=(dims["y"], dims["x"]),
+    ).astype("float32")
 
-    dlr_hyspex_data["solar_zenith_angle"] = (
-        (dims["y"], dims["x"]), get_sza(input_data)
-    )
+    dlr_hyspex_data["solar_zenith_angle"] = xr.DataArray(
+        data=get_sza(input_data),
+        dims=(dims["y"], dims["x"]),
+    ).astype("float32")
 
-    dlr_hyspex_data["solar_azimuth_angle"] = (
-        (dims["y"], dims["x"]), get_saa(input_data)
-    )
+    dlr_hyspex_data["solar_azimuth_angle"] = xr.DataArray(
+        data=get_saa(input_data),
+        dims=(dims["y"], dims["x"])
+    ).astype("float32")
 
-    dlr_hyspex_data["viewing_zenith_angle"] = (
-        (dims["y"], dims["x"]), get_vza(input_data)
-    )
+    dlr_hyspex_data["viewing_zenith_angle"] = xr.DataArray(
+        data=get_vza(input_data),
+        dims=(dims["y"], dims["x"]),
+    ).astype("float32")
 
-    dlr_hyspex_data["viewing_azimuth_angle"] = (
-        (dims["y"], dims["x"]), get_vaa(input_data)
-    )
+    dlr_hyspex_data["viewing_azimuth_angle"] = xr.DataArray(
+        data=get_vaa(input_data),
+        dims=(dims["y"], dims["x"]),
+    ).astype("float32")
 
-    dlr_hyspex_data["observer_altitude"] = (
-        (dims["y"], dims["x"]), get_z(input_data)
-    )
+    dlr_hyspex_data["observer_altitude"] = xr.DataArray(
+        data=get_z(input_data),
+        dims=(dims["y"], dims["x"]),
+    ).astype("float32")
 
     band1_data = xr.Dataset()
 
     wavelength, radiance, radiance_noise = get_spectrum(input_data)
 
-    band1_data["wavelength"] = (
-        (dims["z"]), wavelength
-    )
+    band1_data["wavelength"] = xr.DataArray(
+        data=wavelength,
+        dims=(dims["z"]),
+    ).astype("float32")
 
-    band1_data["radiance"] = (
-        (dims["y"], dims["x"], dims["z"]), radiance
-    )
+    band1_data["radiance"] = xr.DataArray(
+        data=radiance,
+        dims=(dims["y"], dims["x"], dims["z"]),
+    ).astype("float32")
 
-    band1_data["radiance_noise"] = (
-        (dims["y"], dims["x"], dims["z"]), radiance_noise
-    )
+    band1_data["radiance_noise"] = xr.DataArray(
+        data=radiance_noise,
+        dims=(dims["y"], dims["x"], dims["z"]),
+    ).astype("float32")
 
     print("TODO LS: Maybe read surface elevation data?")
 
