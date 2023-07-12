@@ -7,6 +7,7 @@ import sys
 import os
 from datetime import datetime
 from datetime import timedelta
+from cftime import date2num
 
 
 def import_data(config, dims):
@@ -15,10 +16,12 @@ def import_data(config, dims):
 
     prisma_data = xr.Dataset()
 
+    time, time_units_string = get_time(l1b)
     prisma_data["time"] = xr.DataArray(
-        data=get_time(l1b),
+        data=time,
         dims=(dims["y"]),
-    )
+    ).astype("float32")
+    prisma_data.time.attrs["units"] = time_units_string
 
     prisma_data["latitude"] = xr.DataArray(
         data=get_latitude(l2b),
@@ -114,15 +117,19 @@ def get_time(l1b):
     stop_time = datetime.strptime(stop_time, "%Y-%m-%dT%H:%M:%S.%f")
     Ntemporal = len(l1b["/HDFEOS/SWATHS/PRS_L1_HCO/Geolocation Fields/Time"])
 
-    time_diff = timedelta(seconds=(stop_time - start_time).total_seconds())
+    reference_time = datetime.strftime(start_time, "%Y-%m-%d %H:%M:%S.%f")
+    time_units_string = f"seconds since {reference_time}"
 
     time = []
+    time_diff_total = \
+        timedelta(seconds=(stop_time - start_time).total_seconds())
     for i in range(Ntemporal):
-        timestamp = start_time + i/(Ntemporal - 1) * time_diff
-        time_string = datetime.strftime(timestamp, "%Y-%m-%dT%H:%M:%SZ")
-        time.append(time_string)
+        time_measurement = start_time + i/(Ntemporal - 1) * time_diff_total
+        time.append(time_measurement)
 
-    return time
+    time = date2num(time, time_units_string)
+
+    return time, time_units_string
 
 
 def get_latitude(l2b):

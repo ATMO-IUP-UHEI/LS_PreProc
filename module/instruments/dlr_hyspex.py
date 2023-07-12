@@ -1,5 +1,7 @@
 import numpy as np
 import xarray as xr
+from datetime import datetime
+from cftime import date2num
 import os
 
 
@@ -8,10 +10,12 @@ def import_data(config, dims):
 
     dlr_hyspex_data = xr.Dataset()
 
+    time, time_units_string = get_time(input_data)
     dlr_hyspex_data["time"] = xr.DataArray(
-        data=get_time(input_data),
+        data=time,
         dims=(dims["y"]),
-    )
+    ).astype("float32")
+    dlr_hyspex_data.time.attrs["units"] = time_units_string
 
     dlr_hyspex_data["latitude"] = xr.DataArray(
         data=get_latitude(input_data),
@@ -77,9 +81,22 @@ def import_data(config, dims):
 
 def get_time(input_data):
     time = input_data.time.values
-    time = np.array(time, dtype="datetime64[s]")
-    time = [str(x) + "Z" for x in time]
-    return time
+    start_time = np.datetime_as_string(time[0])[:-3]
+    start_time = datetime.strptime(start_time, "%Y-%m-%dT%H:%M:%S.%f")
+
+    reference_time = datetime.strftime(start_time, "%Y-%m-%d %H:%M:%S.%f")
+    time_units_string = f"seconds since {reference_time}"
+
+    out_time = []
+    for measurement_time in time:
+        measurement_time = np.datetime_as_string(measurement_time)[:-3]
+        measurement_time = \
+            datetime.strptime(measurement_time, "%Y-%m-%dT%H:%M:%S.%f")
+        out_time.append(measurement_time)
+
+    out_time = date2num(out_time, time_units_string)
+
+    return out_time, time_units_string
 
 
 def get_latitude(input_data):

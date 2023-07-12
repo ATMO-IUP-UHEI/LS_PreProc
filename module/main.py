@@ -15,7 +15,8 @@ def main():
         sys.exit("Provide settings file as command line argument.")
 
     dims = get_dims()
-    root, band_list, input_file_list = get_data(config["config"], dims)
+    root, band_list, input_file_list = \
+        get_data(config["config"], dims)
     set_attributes(root, band_list, dims)
     write_data(config["config"], root, band_list, input_file_list)
 
@@ -60,10 +61,9 @@ def get_data(config, dims):
 def set_attributes(root, band_list, dims):
     assert "time" in root.data_vars
     assert root.time.dims == (dims["y"],)
-    root.time.attrs["long_name"] = \
-        "UTC date and time of measurement in ISO 8601 standard"
-    root.time.attrs["units"] = \
-        "YYYY-MM-DDThh:mm:ssZ"
+    assert root.time.dtype == "float32"
+    assert root.time.attrs["units"].startswith("seconds since ")
+    root.time.attrs["long_name"] = "date and time in UTC"
 
     assert "latitude" in root.data_vars
     assert root.latitude.dims == (dims["y"], dims["x"])
