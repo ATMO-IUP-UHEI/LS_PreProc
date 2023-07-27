@@ -1,277 +1,358 @@
 import numpy as np
 import xarray as xr
-import cfgrib
 import sys
 import os
+from datetime import datetime
 
 import functions.constants as constants
 
-def main(atm_data, era5_folder_path):
-    print("getting era5 data")
+
+def main(atm, era5_folder_path, nlevel, dims):
+    print(datetime.now(), "getting era5 data")
     # get era5_data from the folder
-    # name(s) of the required file will be constructed from the information in atm_data
+    # name(s) of the required file will be constructed from the information in
+    # atm
     # era5_data comes in multilayer (ml) and surface (sfc) files
-    era5_ml_data = get_era5_data(atm_data, era5_folder_path, "ml")
-    era5_sfc_data = get_era5_data(atm_data, era5_folder_path, "sfc")
+    era5_ml = get_era5(atm, era5_folder_path, "ml")
+    era5_sfc = get_era5(atm, era5_folder_path, "sfc")
 
     # drop unnecessary variables from era5_data and rename needed ones
-    era5_ml_data = prepare_era5_data(era5_ml_data, "ml")
-    era5_sfc_data = prepare_era5_data(era5_sfc_data, "sfc")
+    era5_ml = prepare_era5(era5_ml, "ml")
+    era5_sfc = prepare_era5(era5_sfc, "sfc")
 
-    # prepare variables for atm_data
-    atm_data = prepare_atm_data(atm_data)
+    # merge multilevel and surface datasets
+    era5 = merge_era5(era5_ml, era5_sfc, dims)
 
-    # interpolate to datetime and lat/lon grid of measurement
-    interpolated = interpolate_era5_to_atm(era5_ml_data, era5_sfc_data, atm_data)
+    # calculate pressure grid on era5_levels
+    era5 = calculate_era5_pressure(era5, era5_folder_path)
 
-    # calculate quantities of interest
-    interpolated = calculate_quantities_of_interest(interpolated, era5_folder_path, atm_data)
+    # calculate geometric altitude
+    era5 = calculate_era5_geometric_altitude(atm, era5)
 
-    # correct for high-resolution surface elevation
-    interpolated = correct_elevation(interpolated, atm_data)
+    # calculate h2o mole fraction
+    era5 = calculate_era5_h2o_mole_fraction(era5)
 
-    # interpolate linearly with pressure onto vertical atm_data grid
-    interpolated = interpolate_interpolated_to_target_pressure_grid(interpolated, atm_data)
+    # interpolate era5 to atm time and lat/lon grid
+    era5 = interpolate_era5_onto_atm(atm, era5, dims)
 
-    # write to atm_data
-    atm_data = write_interpolated_to_atm_data(interpolated, atm_data)
+    # correct each pixel for the error in the low-resolution surface elevation
+    # using high resolution surface elevation from atm
+    era5 = correct_surface_elevation(atm, era5)
 
-    return atm_data
+    # interpolate era5 pressure grid onto new pressure grid
+    era5 = interpolate_era5_onto_pressure_grid(atm, era5, nlevel, dims)
+
+    atm["pressure"] = xr.DataArray(
+        data=era5.pressure.values,
+        dims=(dims["y"], dims["x"], dims["z"])
+    ).astype("float32")
+    atm.pressure.attrs["source"] = "era5"
+
+    atm["temperature"] = xr.DataArray(
+        data=era5.temperature.values,
+        dims=(dims["y"], dims["x"], dims["z"])
+    ).astype("float32")
+    atm.temperature.attrs["source"] = "era5"
+
+    atm["geometric_altitude"] = xr.DataArray(
+        data=era5.geometric_altitude.values,
+        dims=(dims["y"], dims["x"], dims["z"])
+    ).astype("float32")
+    atm.geometric_altitude.attrs["source"] = "era5"
+
+    atm = atm.drop("surface_elevation")
+
+    atm["h2o"] = xr.DataArray(
+        data=era5.h2o.values,
+        dims=(dims["y"], dims["x"], dims["z"])
+    ).astype("float32")
+    atm.h2o.attrs["source"] = "era5"
+
+    return atm
 
 
-
-def get_era5_data(atm_data, era5_folder_path, era5_type):
-    file_name_list = generate_file_list_from_atm_data(atm_data, era5_type)
+def get_era5(atm, era5_folder_path, era5_type):
+    file_name_list = generate_file_list_from_atm(atm, era5_type)
 
     era5_data_set = False
     for file_name in file_name_list:
-        era5_data = xr.open_dataset(f"{era5_folder_path}/{file_name}", engine = "cfgrib")
+        era5 = xr.open_dataset(
+            f"{era5_folder_path}/{file_name}", engine="cfgrib"
+        )
 
         if not era5_data_set:
-            merged = era5_data
+            merged = era5
             era5_data_set = True
 
-        era5_data = xr.merge([era5_data, merged])
+        era5 = xr.merge([era5, merged])
         merged.close()
-    return era5_data
+    return era5
 
 
-
-def generate_file_list_from_atm_data(atm_data, era5_type):
-    yyyymmdd = "".join((atm_data.attrs["ISO 8601 datetime"].split("T")[0]).split("-"))
+def generate_file_list_from_atm(atm, era5_type):
+    yyyymmdd = "".join(str(min(atm.time).values)[:10].split("-"))
 
     file_name_list = [f"era5_{era5_type}_{yyyymmdd}.grb"]
 
     return file_name_list
 
 
-
-def prepare_era5_data(era5_data, era5_type):
-    era5_data.latitude.attrs["standard_name"] = "latitude"
-    era5_data.latitude.attrs["units"] = "degrees north"
-
-    era5_data.longitude.attrs["standard_name"] = "longitude"
-    era5_data.longitude.attrs["units"] = "degrees east"
-
+def prepare_era5(era5, era5_type):
     if era5_type == "ml":
-        era5_data = era5_data.drop(["step", "valid_time"])
-        era5_data = era5_data.rename({"hybrid": "level", "time": "datetime"})
-        era5_data = era5_data.drop_vars("level")
-        era5_data = era5_data.rename({"t": "temperature", "q": "specific_humidity"})
+        era5 = era5.drop(["step", "valid_time"])
+        era5 = era5.rename({"hybrid": "era5_level"})
+        era5 = era5.drop_vars("era5_level")
+        era5 = era5.rename({"t": "temperature", "q": "specific_humidity"})
 
-        era5_data.temperature.attrs["standard_name"] = "temperature"
-        era5_data.temperature.attrs["units"] = "K"
-        era5_data = era5_data.assign(temperature = era5_data.temperature.astype(np.float64))
-
-        era5_data.specific_humidity.attrs["standard_name"] = "specific humidity"
-        era5_data.specific_humidity.attrs["units"] = "kg kg-1"
-        era5_data = era5_data.assign(specific_humidity = era5_data.specific_humidity.astype(np.float64))
+        era5 = era5.assign(temperature=era5.temperature.astype(np.float32))
+        era5 = era5.assign(
+            specific_humidity=era5.specific_humidity.astype(np.float32)
+        )
 
     if era5_type == "sfc":
-        era5_data = era5_data.drop(["number", "step", "surface", "valid_time"])
-        era5_data = era5_data.rename({"time": "datetime"})
-        era5_data = era5_data.rename({"z": "surface_geopotential", "sp": "surface_pressure"})
+        era5 = era5.drop(["number", "step", "surface", "valid_time"])
+        era5 = era5.rename(
+            {"z": "surface_geopotential", "sp": "surface_pressure"}
+        )
 
-        era5_data.surface_geopotential.attrs["standard_name"] = "geopotential at surface"
-        era5_data.surface_geopotential.attrs["units"] = "m2 s-2"
-        era5_data = era5_data.assign(surface_geopotential = era5_data.surface_geopotential.astype(np.float64))
+        era5 = era5.assign(
+            surface_geopotential=era5.surface_geopotential.astype(np.float32)
+        )
+        era5 = era5.assign(
+            surface_pressure=era5.surface_pressure.astype(np.float32)
+        )
+        era5 = era5.assign(u10=era5.u10.astype(np.float32))
+        era5 = era5.assign(v10=era5.v10.astype(np.float32))
 
-        era5_data.surface_pressure.attrs["standard_name"] = "surface pressure"
-        era5_data.surface_pressure.attrs["units"] = "kg m-1 s-2"
-        era5_data = era5_data.assign(surface_pressure = era5_data.surface_pressure.astype(np.float64))
-
-        era5_data = era5_data.assign(u10 = era5_data.u10.astype(np.float64))
-        era5_data = era5_data.assign(v10 = era5_data.v10.astype(np.float64))
-
-    return era5_data
-
+    return era5
 
 
-def prepare_atm_data(atm_data):
-    nlevel = 60
-    nline = len(atm_data.line)
-    nsample = len(atm_data.sample)
+def merge_era5(era5_ml, era5_sfc, dims):
+    # latitude and longitude grids are almost the same but not quite
+    # this leads to problems when merging.
+    # Don't want to interpolate onto atm grid yet, as it is very fine, meaning
+    # we have to do a lot of calculations. Much better to do them first, and
+    # then interpolate onto the fine grid.
+    # Therefore, we will here interpolate on a dummy grid, which is almost like
+    # the grids for the ml and sfc data
 
-    atm_data["pressure"] = (("line", "sample", "level"), np.empty(shape = (nline, nsample, nlevel)))
-    atm_data.pressure.attrs["standard_name"] = "pressure"
-    atm_data.pressure.attrs["units"] = "kg m-1 s-2"
+    min_latitude = max(min(era5_ml.latitude), min(era5_sfc.latitude))
+    max_latitude = min(max(era5_ml.latitude), max(era5_sfc.latitude))
+    Nlat = len(era5_ml.latitude.values)
 
-    atm_data["temperature"] = (("line", "sample", "level"), np.empty(shape = (nline, nsample, nlevel)))
-    atm_data.temperature.attrs["standard_name"] = "temperature"
-    atm_data.temperature.attrs["units"] = "K"
+    min_longitude = max(min(era5_ml.longitude), min(era5_sfc.longitude))
+    max_longitude = min(max(era5_ml.longitude), max(era5_sfc.longitude))
+    Nlon = len(era5_ml.longitude.values)
 
-    atm_data["geometric_altitude"] = (("line", "sample", "level"), np.empty(shape = (nline, nsample, nlevel)))
-    atm_data.geometric_altitude.attrs["standard_name"] = "geometric altitude"
-    atm_data.geometric_altitude.attrs["units"] = "m"
+    new_latitude = np.linspace(min_latitude, max_latitude, Nlat)
+    new_longitude = np.linspace(min_longitude, max_longitude, Nlon)
 
-    atm_data["h2o"] = (("line", "sample", "level"), np.empty(shape = (nline, nsample, nlevel)))
-    atm_data.h2o.attrs["standard_name"] = "H2O mole fraction"
-    atm_data.h2o.attrs["units"] = "mol mol-1"
+    era5_ml = era5_ml.interp(
+        latitude=new_latitude,
+        longitude=new_longitude
+    )
 
-    return atm_data
+    era5_sfc = era5_sfc.interp(
+        latitude=new_latitude,
+        longitude=new_longitude
+    )
 
+    era5 = xr.merge([era5_ml, era5_sfc])
 
-
-def interpolate_era5_to_atm(era5_ml_data, era5_sfc_data, atm_data):
-    interpolated_ml = era5_ml_data.interp(datetime = np.datetime64(atm_data.attrs["ISO 8601 datetime"]), latitude = atm_data.latitude, longitude = atm_data.longitude)
-    interpolated_sfc = era5_sfc_data.interp(datetime = np.datetime64(atm_data.attrs["ISO 8601 datetime"]), latitude = atm_data.latitude, longitude = atm_data.longitude)
-    interpolated = xr.merge([interpolated_ml, interpolated_sfc])
-
-    interpolated = interpolated.transpose("line", "sample", "level")
-
-    return interpolated
+    return era5
 
 
-
-def calculate_quantities_of_interest(interpolated, era5_folder_path, atm_data):
-    nline = len(interpolated.line)
-    nsample = len(interpolated.sample)
-    nlevel = len(interpolated.level)
-
-    # get standard ecmwd atmosphere parameters from file downloaded from https://confluence.ecmwf.int/display/UDOC/L137+model+level+definitions
+def calculate_era5_pressure(era5, era5_folder_path):
+    # get standard ecmwd atmosphere parameters from file downloaded from
+    # https://confluence.ecmwf.int/display/UDOC/L137+model+level+definitions
     try:
         auxiliary_path = os.path.join(era5_folder_path, "..", "auxiliary")
         n, a, b, ph, pf, gpa, gma, t, rho = np.genfromtxt(
             os.path.join(auxiliary_path, "standard_atmosphere.csv"),
-            delimiter = ",", skip_header = 2, unpack = True)
-    except:
-        sys.exit("standard_atmosphere.csv missing. Download from https://confluence.ecmwf.int/display/UDOC/L137+model+level+definitions and put it into data/external/era5/auxiliary/")
+            delimiter=",", skip_header=2, unpack=True)
+    except FileNotFoundError:
+        sys.exit("standard_atmosphere.csv missing. Download from "
+                 + "https://confluence.ecmwf.int/display/UDOC/L137+model+"
+                 + "level+definitions and put it into "
+                 + "data/external/era5/auxiliary/")
 
     # pressure
     # pressure for layers is given at lower boundary of the model level
     # pressure calculated using a and b parameters and the following manual:
     # https://www.ecmwf.int/sites/default/files/elibrary/2015/9210-part-iii-dynamics-and-numerical-procedures.pdf
-    interpolated["pressure"] = (("line", "sample", "level"), np.empty(shape = (nline, nsample, nlevel)))
-    interpolated.pressure.attrs["standard_name"] = "pressure"
-    interpolated.pressure.attrs["units"] = "kg m-1 s-2"
+    pressure = a[None, :, None, None] + b[None, :, None, None] \
+        * era5.surface_pressure.values[:, None, :, :]
 
-    pressures = a[None, None, :] + b[None, None, :] * interpolated.surface_pressure.values[:, :, None]
-    interpolated.pressure.values = pressures
+    era5["pressure"] = xr.DataArray(
+        data=pressure,
+        dims=("time", "era5_level", "latitude", "longitude")
+    )
 
+    era5 = era5.drop("surface_pressure")
+
+    return era5
+
+
+def calculate_era5_geometric_altitude(atm, era5):
+
+    # get surface elevation from surface geopotential
+    surface_elevation = \
+        era5.surface_geopotential / constants.gravitational_acceleration()
+
+    geometric_altitude = \
+        surface_elevation \
+        + constants.scale_height \
+        * np.log(era5.pressure[:, -1, :, :]/era5.pressure[:, :, :, :])
+
+    geometric_altitude = geometric_altitude.transpose(
+        "time", "era5_level", "latitude", "longitude"
+    )
+
+    era5["geometric_altitude"] = xr.DataArray(
+        data=geometric_altitude,
+        dims=("time", "era5_level", "latitude", "longitude")
+    )
+
+    era5 = era5.drop("surface_geopotential")
+
+    return era5
+
+
+def calculate_era5_h2o_mole_fraction(era5):
     # water vapor mole fraction
     # specific humidity is converted into h2o mole fraction using
     # s = m_H2O / m_HUM (s = specific humidity)
     # m_X = N_X * m_X
     # m_HUM = m_DRY + m_H2O
     # to find: h2o_mole_fraction = N_H2O / N_DRY = s/(1-s) * M_DRY/M_H2O
-    interpolated["h2o"] = (("line", "sample", "level"), np.empty(shape = (nline, nsample, nlevel)))
-    interpolated.h2o.attrs["standard_name"] = "H2O mole fraction"
-    interpolated.h2o.attrs["units"] = "mol mol-1"
+    h2o = era5.specific_humidity \
+        / (1 - era5.specific_humidity) \
+        * constants.molar_mass_dry_air \
+        / constants.molar_mass_h2o
 
-    h2o = interpolated.specific_humidity / (1 - interpolated.specific_humidity) * constants.molar_mass_dry_air / constants.molar_mass_h2o
-    interpolated.h2o.values = h2o
+    era5["h2o"] = xr.DataArray(
+        data=h2o,
+        dims=("time", "era5_level", "latitude", "longitude")
+    )
 
-    # geometric altitude
-    interpolated["geometric_altitude"] = (("line", "sample", "level"), np.empty(shape = (nline, nsample, nlevel)))
-    interpolated.geometric_altitude.attrs["standard_name"] = "geometric altitude"
-    interpolated.geometric_altitude.attrs["units"] = "m"
+    era5 = era5.drop("specific_humidity")
 
-    # TODO: what happens here?
-    print("todo: is low resolution surface elevation actually compared to high resolution surface elevation later?")
-    gma = atm_data.surface_elevation.values[:, :, None] + constants.scale_height * np.log(interpolated.pressure[..., -1]/interpolated.pressure[...])
-    interpolated.geometric_altitude.values = gma
-
-    return interpolated
+    return era5
 
 
+def interpolate_era5_onto_atm(atm, era5, dims):
+    era5 = era5.interp(
+        time=atm.time,
+        latitude=atm.latitude,
+        longitude=atm.longitude
+    )
 
-def correct_elevation(interpolated, atm_data):
+    era5 = era5.transpose(dims["y"], dims["x"], "era5_level")
 
-    interpolated.geometric_altitude[0, 0].values += -20
-    interpolated.geometric_altitude[0, 1].values += +20
-
-    interpolated = interpolated.where(interpolated.geometric_altitude >= atm_data.surface_elevation)
-
-    ground_level = interpolated.geometric_altitude.argmin(dim="level", skipna=True)
-
-    elevation_difference = interpolated.geometric_altitude[..., ground_level] - atm_data.surface_elevation
-
-    interpolated.geometric_altitude[..., ground_level] = atm_data.surface_elevation
-
-    scale_height = interpolated.temperature[..., ground_level] * constants.gas_constant / constants.molar_mass_dry_air / constants.gravitational_acceleration()
-    interpolated.pressure[..., ground_level] = interpolated.pressure[..., ground_level] * np.exp(elevation_difference / scale_height)
-
-    interpolated.temperature[..., ground_level] = interpolated.temperature[..., ground_level] - constants.lapse_rate_lower_troposphere * elevation_difference
-
-    # interpolated.specific_humidity[..., ground_level] is assumed to have a constant profile, no change necessary
-
-    return interpolated
+    return era5
 
 
+def correct_surface_elevation(atm, era5):
+    above_ground = era5.geometric_altitude >= atm.surface_elevation
+    era5["pressure"] = era5.pressure.where(above_ground)
+    era5["temperature"] = era5.temperature.where(above_ground)
+    era5["geometric_altitude"] = era5.geometric_altitude.where(above_ground)
+    era5["h2o"] = era5.h2o.where(above_ground)
 
-def correct_elevation_old(interpolated, atm_data):
-    # operations need to be performed on each line, sample pixel of the interpolated dataset
-    # this is done here by grouping the dataset by location. Since grouping by multiple
-    # dimensions is not supported by xarray, yet, line and sample are stacked into a new
-    # dimension called location, first. After modifying the dataset it is unstacked again
-    interpolated = interpolated.stack(location=["line", "sample"])
-    interpolated = interpolated.groupby("location")
-    interpolated = interpolated.apply(correct_elevation_for_pixel, args=[atm_data])
-    interpolated = interpolated.unstack("location")
-    interpolated = interpolated.drop_vars(["line", "sample"])
-    interpolated = interpolated.transpose("line", "sample", "level")
+    ground_level = \
+        era5.geometric_altitude.argmin(dim="era5_level", skipna=True)
 
-    return interpolated
+    elevation_difference = \
+        era5.geometric_altitude[..., ground_level] - atm.surface_elevation
 
+    scale_height = \
+        era5.temperature[..., ground_level] \
+        * constants.gas_constant \
+        / constants.molar_mass_dry_air \
+        / constants.gravitational_acceleration()
 
+    era5.geometric_altitude[..., ground_level] = \
+        atm.surface_elevation
 
-def correct_elevation_for_pixel(interpolated_pixel, atm_data):
-    nlevel = len(interpolated_pixel.level)
+    era5.pressure[..., ground_level] = \
+        era5.pressure[..., ground_level] \
+        * np.exp(elevation_difference / scale_height)
 
-    # drop all altitudes from era5 that are below the dem surface elevation
-    dem_surface_elevation = atm_data.isel(line=interpolated_pixel.line, sample=interpolated_pixel.sample).surface_elevation
-    interpolated_pixel = interpolated_pixel.where(interpolated_pixel.geometric_altitude >= dem_surface_elevation)
+    era5.temperature[..., ground_level] = \
+        era5.temperature[..., ground_level] \
+        - constants.lapse_rate_lower_troposphere \
+        * elevation_difference
 
-    # lowest value has to be set to surface level
-    # if no nan value exists, replace bottom level with ground level
-    # if at least one nan value exists at and above the bottom level,
-    # replace first non nan value with ground level
-    ground_level = np.nanargmax(interpolated_pixel.pressure)
+    # era5.specific_humidity[..., ground_level] is assumed to have a constant
+    # profile, no change necessary
 
-    # difference between digital elevation model surface elevation
-    # and the lowest elevation given in the era5 model above the ground
-    # the lowest level of the altitude profile is just above the ground
-    # data profiles must be extended downwards to touch the surface
-    era5_lowest_elevation = interpolated_pixel.geometric_altitude[ground_level]
-    elevation_difference = era5_lowest_elevation - dem_surface_elevation
-
-    # surface altitude is set to digital elevation model altitude
-    interpolated_pixel.geometric_altitude[ground_level] = dem_surface_elevation
-
-    # pressure is extended according to barometric height formula
-    scale_height = interpolated_pixel.temperature[ground_level] * constants.gas_constant / constants.molar_mass_dry_air / constants.gravitational_acceleration()
-    interpolated_pixel.pressure[ground_level] = interpolated_pixel.pressure[ground_level] * np.exp(elevation_difference / scale_height)
-
-    # temperature is extended according to adiabatic lapse rate
-    interpolated_pixel.temperature[ground_level] = interpolated_pixel.temperature[ground_level] - constants.lapse_rate_lower_troposphere * elevation_difference
-
-    # specific humidity is extended downwards constantly (no change necessary)
-
-    return interpolated_pixel
+    return era5
 
 
+def interpolate_era5_onto_pressure_grid(atm, era5, nlevel, dims):
+    nlevel = int(nlevel)
 
-def interpolate_interpolated_to_target_pressure_grid(interpolated, atm_data):
+    old_level_grid = np.tile(
+        era5.era5_level.values, (len(atm[dims["y"]]), len(atm[dims["x"]]), 1)
+    )
+    old_pressure_grid = era5.pressure.values
+
+    new_min_pressure = \
+        era5.pressure.min(dim="era5_level", skipna=True)
+    new_max_pressure = \
+        era5.pressure.max(dim="era5_level", skipna=True)
+
+    new_pressure_grid = np.linspace(new_min_pressure, new_max_pressure, nlevel)
+    new_pressure_grid = np.moveaxis(new_pressure_grid, [0, 1, 2], [2, 0, 1])
+
+    # something like this would be cool but doesn't exist for 3D grids
+    # new_level_grid = \
+    #     np.interp(new_pressure_grid, old_pressure_grid, old_level_grid)
+    Nx = len(atm[dims["x"]])
+    Ny = len(atm[dims["y"]])
+    Nz = nlevel
+
+    new_level_grid = np.empty(shape=new_pressure_grid.shape)
+    for y in range(Ny):
+        for x in range(Nx):
+            new_level_grid[y, x, :] = np.interp(
+                new_pressure_grid[y, x, :],
+                old_pressure_grid[y, x, :],
+                old_level_grid[y, x, :]
+            )
+
+    new_level_grid = xr.DataArray(
+        data=new_level_grid,
+        dims=(dims["y"], dims["x"], dims["z"])
+    ).astype("float32")
+
+    # something like this would be cool but doesn't exist for 3D grids
+    # era5 = era5.interp(era5_level=new_level_grid)
+    # instead of doing a 3D interpolation, it tries to split the era5_level
+    # dimension into 3 coordinates, not what we want.
+    # Finding an efficient way to do this will save the bulk of the calculation
+    # time, sadly. This is super slow.
+    for variable in ["pressure", "temperature", "geometric_altitude", "h2o"]:
+        variable_array = np.empty(shape=(Ny, Nx, Nz), dtype="float32")
+        for y in range(Ny):
+            for x in range(Nx):
+                era5_pixel = era5.isel(frame=y, line=x)
+                era5_pixel = \
+                    era5_pixel.interp(
+                        era5_level=new_level_grid[y, x, :].values
+                    )
+                variable_array[y, x, :] = era5_pixel[variable].values
+
+        era5 = era5.drop(variable)
+        era5[variable] = xr.DataArray(
+            data=variable_array,
+            dims=(dims["y"], dims["x"], dims["z"])
+        ).astype("float32")
+
+    return era5
+
+
+def interpolate_interpolated_to_target_pressure_grid_lukas_pilz(interpolated, atm_data):
     min_pressure_grid = interpolated.pressure.min(dim="level", skipna=True)
     min_pressure_grid = min_pressure_grid.where(min_pressure_grid > 2, other=2)
     max_pressure_grid = interpolated.pressure.max(dim="level", skipna=True)
@@ -333,10 +414,7 @@ def interpolate_interpolated_to_target_pressure_grid(interpolated, atm_data):
 
     sys.exit(interpolated)
 
-
-
     return interpolated
-
 
 
 def interpolate_interpolated_to_target_pressure_grid_toffer(interpolated, atm_data):
@@ -351,7 +429,7 @@ def interpolate_interpolated_to_target_pressure_grid_toffer(interpolated, atm_da
         dims=["line", "sample", "level_target"],
         coords={"line": min_pressure_grid.line.values, "sample": min_pressure_grid.sample.values}
     )
-    
+
     # interpolated.pressure: line, sample, level   3, 4, 137
     # pressure_grid: line, sample, level_target    3, 4, 60
 
@@ -399,55 +477,3 @@ def interpolate_interpolated_to_target_pressure_grid_toffer(interpolated, atm_da
 
 
 
-def write_interpolated_to_atm_data(interpolated, atm_data):
-    atm_data.temperature.values = interpolated.temperature.values
-    atm_data.pressure.values = interpolated.pressure.values
-    atm_data.geometric_altitude.values = interpolated.geometric_altitude.values
-    atm_data.h2o.values = interpolated.h2o.values
-
-    return atm_data
-
-
-
-def write_to_atm_data_old(interpolated, atm_data):
-    # operations need to be performed on each line, sample pixel of the interpolated dataset
-    # this is done here by grouping the dataset by location. Since grouping by multiple
-    # dimensions is not supported by xarray, yet, line and sample are stacked into a new
-    # dimension called location, first. After modifying the dataset it is unstacked again
-    interpolated = interpolated.stack(location=["line", "sample"])
-    interpolated = interpolated.groupby("location")
-    interpolated = interpolated.apply(interpolate_pixel_to_atm_pressure, args=[atm_data])
-    interpolated = interpolated.unstack("location")
-    interpolated = interpolated.drop_vars(["line", "sample"])
-    interpolated = interpolated.transpose("line", "sample", "level")
-
-    atm_data.temperature.values = interpolated.temperature.values
-    atm_data.pressure.values = interpolated.pressure.values
-    atm_data.geometric_altitude.values = interpolated.geometric_altitude.values
-    atm_data.h2o.values = interpolated.h2o.values
-
-    return atm_data
-
-
-
-def interpolate_pixel_to_atm_pressure(interpolated_pixel, atm_data):
-    atm_nlevel = 60
-    min_pressure = np.nanmin(interpolated_pixel.pressure)
-    min_pressure = np.nanmax([2, min_pressure])
-    max_pressure = np.nanmax(interpolated_pixel.pressure)
-    level_grid = interpolated_pixel.level.values
-    pressure_grid = interpolated_pixel.pressure.values
-
-    # interpolate onto grid linear in pressure (there has to be a built in function for this)
-    new_pressure_grid = np.linspace(min_pressure, max_pressure, atm_nlevel)
-    new_level_grid = np.interp(new_pressure_grid, pressure_grid, level_grid)
-    interpolated_pixel = interpolated_pixel.interp(level=new_level_grid)
-
-    interpolated_pixel = interpolated_pixel.drop_vars(["level"])
-
-    return interpolated_pixel
-
-
-
-if __name__ == "__main__":
-    main(atm_data, era5_folder_path)

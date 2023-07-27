@@ -3,8 +3,11 @@
 *.idx
 
 # data should not be included
-module/data/input/*.nc
-module/data/external/*
+module/data/aster/download/*
+module/data/era5/download/*
+module/data/era5/auxiliary/*
+module/data/egg4/download/*
+module/output
 
 module/data/download_scripts/aster/output/*
 module/data/download_scripts/era5/output/*
