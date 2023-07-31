@@ -58,7 +58,8 @@ def main(atm, era5_folder_path, nlevel, dims):
         data=era5.geometric_altitude.values,
         dims=(dims["y"], dims["x"], dims["z"])
     ).astype("float32")
-    atm.geometric_altitude.attrs["source"] = "era5"
+    atm.geometric_altitude.attrs["source"] = \
+        f"era5. surface elevation: {atm.surface_elevation.attrs['source']}"
 
     atm = atm.drop("surface_elevation")
 
@@ -336,144 +337,17 @@ def interpolate_era5_onto_pressure_grid(atm, era5, nlevel, dims):
         variable_array = np.empty(shape=(Ny, Nx, Nz), dtype="float32")
         for y in range(Ny):
             for x in range(Nx):
-                era5_pixel = era5.isel(frame=y, line=x)
-                era5_pixel = \
-                    era5_pixel.interp(
-                        era5_level=new_level_grid[y, x, :].values
-                    )
-                variable_array[y, x, :] = era5_pixel[variable].values
+                data = era5[variable].isel(frame=y, line=x)
+                level = new_level_grid[y, x, :]
+                variable_array[y, x, :] = data.interp(era5_level=level)
 
         era5 = era5.drop(variable)
+
         era5[variable] = xr.DataArray(
             data=variable_array,
             dims=(dims["y"], dims["x"], dims["z"])
         ).astype("float32")
 
+        variable_array = None
+
     return era5
-
-
-def interpolate_interpolated_to_target_pressure_grid_lukas_pilz(interpolated, atm_data):
-    min_pressure_grid = interpolated.pressure.min(dim="level", skipna=True)
-    min_pressure_grid = min_pressure_grid.where(min_pressure_grid > 2, other=2)
-    max_pressure_grid = interpolated.pressure.max(dim="level", skipna=True)
-
-    pressure_grid = np.linspace(min_pressure_grid, max_pressure_grid, len(atm_data.level))
-    pressure_grid = pressure_grid.transpose([1, 2, 0])
-    pressure_grid = xr.DataArray(
-        pressure_grid,
-        dims=["line", "sample", "level_target"],
-        coords={"line": min_pressure_grid.line.values, "sample": min_pressure_grid.sample.values}
-    )
-
-    import xgcm
-
-    interpolated = interpolated.assign_coords({
-        "line": ("line", range(len(interpolated.line.values))),
-        "sample": ("sample", range(len(interpolated.sample.values))),
-        "level": ("level", range(len(interpolated.level.values)))})
-
-    interpolated.line.attrs["axis"] = "X"
-    interpolated.sample.attrs["axis"] = "Y"
-    interpolated.level.attrs["axis"] = "Z"
-
-    interpolated = interpolated.chunk({"line": 250, "sample": 250, "level": -1})
-
-    grid = xgcm.Grid(interpolated, periodic=False)
-    from functools import partial
-    
-    def transformer(data, target_levels, target_data):
-        data = xr.DataArray(
-            data,
-            dims=["level"],
-            coords={"level": ("level", range(len(data)))})
-        data.level.attrs["axis"] = "Z"
-
-        target_data = xr.DataArray(
-            target_data,
-            dims=["level"],
-            coords={"level": ("level", range(len(target_data)))})
-        target_data.level.attrs["axis"] = "Z"
-
-        return grid.transform(data, 'Z', target_levels, target_data=target_data, method='log')
-
-    for var in set(interpolated.data_vars) - {"pressure"}:
-        interpolated[var].persist()
-        if "level" in interpolated[var].dims:
-            trans_var = xr.apply_ufunc(
-                transformer,
-                *[interpolated[var], pressure_grid, interpolated.pressure],
-                input_core_dims=[['level'], ['level_target'], ['level']],
-                output_core_dims=[['level_target']],
-                dask="parallelized",
-                vectorize=True
-            )
-
-            interpolated[var] = trans_var
-
-    interpolated["pressure"] = pressure_grid
-
-    sys.exit(interpolated)
-
-    return interpolated
-
-
-def interpolate_interpolated_to_target_pressure_grid_toffer(interpolated, atm_data):
-    min_pressure_grid = interpolated.pressure.min(dim="level", skipna=True)
-    min_pressure_grid = min_pressure_grid.where(min_pressure_grid > 2, other=2)
-    max_pressure_grid = interpolated.pressure.max(dim="level", skipna=True)
-
-    pressure_grid = np.linspace(min_pressure_grid, max_pressure_grid, len(atm_data.level))
-    pressure_grid = pressure_grid.transpose([1, 2, 0])
-    pressure_grid = xr.DataArray(
-        pressure_grid,
-        dims=["line", "sample", "level_target"],
-        coords={"line": min_pressure_grid.line.values, "sample": min_pressure_grid.sample.values}
-    )
-
-    # interpolated.pressure: line, sample, level   3, 4, 137
-    # pressure_grid: line, sample, level_target    3, 4, 60
-
-    # # with dask
-    # pressure_difference = pressure_grid.chunk({"line": 10, "sample": 10}) - interpolated.pressure.chunk({"line": 10, "sample": 10})
-    # print("compute")
-    # import dask.distributed
-    # client = dask.distributed.Client()
-    # print(client)
-    # client.compute(pressure_difference)
-    # pressure_difference = pressure_difference.compute(parallel=False)
-    # print("done computing")
-
-    # without dask
-    pressure_difference = pressure_grid - interpolated.pressure
-
-    transition_matrix = xr.zeros_like(pressure_difference)
-
-    # TODO: document what this does :)
-    level_index_above_level_target = pressure_difference.where(pressure_difference>=0).argmin(dim="level", skipna=True)
-    level_index_below_level_target = pressure_difference.where(pressure_difference<=0).argmax(dim="level", skipna=True)
-    pressure_diff_at_upper_level = pressure_difference[..., level_index_above_level_target]
-    pressure_diff_at_lower_level = pressure_difference[..., level_index_below_level_target]
-    pressure_diff_between_levels = pressure_diff_at_upper_level - pressure_diff_at_lower_level
-    upper_weight = np.abs(pressure_diff_at_lower_level) / pressure_diff_between_levels
-    lower_weight = pressure_diff_at_upper_level / pressure_diff_between_levels
-    # handle case where the pressure on a level equals the pressure on a target_level, therefore pressure_diff is zero
-    upper_weight = upper_weight.fillna(0)
-    lower_weight = lower_weight.fillna(1)
-    transition_matrix[..., level_index_above_level_target] = upper_weight
-    transition_matrix[..., level_index_below_level_target] = lower_weight
-
-    magic_interpolation_constant = 42
-    for variable in interpolated.data_vars:
-        if "level" in interpolated[variable].dims:
-            interpolated[f"{variable}_target"] = interpolated.fillna(magic_interpolation_constant)[variable].dot(transition_matrix, dims="level")
-            interpolated = interpolated.drop_vars(variable).rename({f"{variable}_target": variable})
-
-    interpolated = interpolated.rename_dims(level_target="level")
-
-    print(interpolated)
-    sys.exit()
-
-    return interpolated
-
-
-
