@@ -76,7 +76,7 @@ def main():
         "925", "950", "1000"
     ]
 
-    output_file = f"download/egg4_{yyyymmdd}.grb"
+    output_file = f"../data/egg4/download/egg4_{yyyymmdd}.grb"
 
     os.system("cp ~/.cdsapirc_ads ~/.cdsapirc")
 

@@ -78,7 +78,7 @@ def main():
     retrieve_parameters["param"] = "130/133"
     # 130 - temperature / K
     # 133 - specific humidity / kg kg-1
-    output_file = f"output/era5_ml_{yyyymmdd}.grb"
+    output_file = f"../data/era5/download/era5_ml_{yyyymmdd}.grb"
     c.retrieve(
         database_name,
         retrieve_parameters,
@@ -93,7 +93,7 @@ def main():
     # 134 - surface pressure / kg m-1 s-2
     # 165 - 10m u-component of wind / m s-1
     # 166 - 10m v-component of wind / m s-1
-    output_file = f"output/era5_sfc_{yyyymmdd}.grb"
+    output_file = f"../data/era5/download/era5_sfc_{yyyymmdd}.grb"
     c.retrieve(
         database_name,
         retrieve_parameters,
