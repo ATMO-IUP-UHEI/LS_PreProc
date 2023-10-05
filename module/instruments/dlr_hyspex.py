@@ -147,10 +147,10 @@ def get_z(input_data):
 
 def get_spectrum(input_data):
     # Wavelength in nm
-    wavelength = input_data.wavelength.values
+    wavelength = input_data.wavelength.mean(dim="across_track_pixel_index")
 
     # Radiance in mW m-2 sr-1 nm-1
-    radiance = input_data.radiance.values
+    radiance = input_data.radiance
 
     # Convert units
     # mW m-2 sr-1 nm-1 -> photons s-1 cm-2 sr-1 nm-1
@@ -165,4 +165,4 @@ def get_spectrum(input_data):
     snr = 100/1
     radiance_noise = radiance / snr
 
-    return wavelength, radiance, radiance_noise
+    return wavelength.values, radiance.values, radiance_noise.values
