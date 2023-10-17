@@ -324,7 +324,7 @@ def get_spectrum(meta, l1b, spectral_domain):
     # digital signal, but I am following along with Luis Guanter's read
     # routine.
     # Furthermore, Section 4 mentions a background value, not sure what that
-    # is for.
+    # is for, but it is zero for L1B data.
     # radiance in W m-2 sr-1 nm-1
     radiance = \
         digital_number[:, :, :] * gain[:, None, None] + offset[:, None, None]
