@@ -25,9 +25,8 @@ def main():
     dims = get_dims()
 
     l1b = xr.open_dataset(f"{general['data_path']}/{general['l1b_file']}")
-    atm = create_atm(l1b, dims)
 
-    atm = atm.isel(frame=range(6), line=range(5))
+    atm = create_atm(l1b, dims)
 
     atm = get_data(atm, general, sources, dims)
     atm = set_attributes(atm, dims)
@@ -202,4 +201,8 @@ def write_data(atm, output):
 
 
 if __name__ == "__main__":
+    import time
+    start = time.time()
     main()
+    end = time.time()
+    print(f"total elapsed time:       {end - start} s.")
