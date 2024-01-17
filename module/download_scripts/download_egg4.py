@@ -80,8 +80,6 @@ output_file = f"../data/egg4/download/egg4_{yyyymmdd}.grb"
 
 os.system("cp ~/.cdsapirc_ads ~/.cdsapirc")
 
-print(retrieve_parameters)
-
 c = cdsapi.Client()
 c.retrieve(
     database_name,
