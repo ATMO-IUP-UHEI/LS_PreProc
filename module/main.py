@@ -158,9 +158,6 @@ def set_attributes(root, band_list, dims):
 
 
 def write_data(config, root, band_list, input_file_list):
-    output_instrument_string = \
-        config["instrument"].lower().replace(" ", "_")
-
     history_string = \
         "Created using the L1B preprocessor for RemoTeC for "\
         + f"{config['instrument']} data. " \
@@ -168,7 +165,7 @@ def write_data(config, root, band_list, input_file_list):
 
     root.attrs["history"] = history_string
 
-    output_file_name = f"output/L1B_{output_instrument_string}.nc"
+    output_file_name = config["output"]
 
     for group_num, output_data in enumerate([root, *band_list]):
         for var in output_data.data_vars:
