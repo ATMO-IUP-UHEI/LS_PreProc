@@ -264,9 +264,18 @@ def interpolate_corners_to_grid(
     Ntemporal = int(meta.find("./specific/heightOfScene").text)
     Nspatial = int(meta.find("./specific/widthOfScene").text)
 
+    orbit_direction = meta.find("./specific/orbitDirection").text
+
+    if orbit_direction == "ASCENDING":
+        data = [[lower_left, upper_left], [lower_right, upper_right]]
+    elif orbit_direction == "DESCENDING":
+        data = [[upper_left, lower_left], [upper_right, lower_right]]
+    else:
+        sys.exit(f"Bad orbit direction {orbit_direction}. Must be ",
+                 +"ASCENDING or DESCENDING.")
+
     da = xr.DataArray(
-        data=[[lower_left, upper_left],
-              [lower_right, upper_right]],
+        data=data,
         dims=("x", "y"),
         coords={"x": [0, Nspatial - 1], "y": [0, Ntemporal - 1]},
     )
