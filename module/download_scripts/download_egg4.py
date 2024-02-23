@@ -28,6 +28,13 @@ yyyy_mm_dd = start_yyyy_mm_dd
 
 yyyymmdd = "".join(yyyy_mm_dd.split("-"))
 
+override_year = True
+if override_year:
+    print("OVERRIDING YEAR")
+    print("YEAR OF DATA:", yyyy_mm_dd[:4])
+    yyyy_mm_dd = "2020" + yyyy_mm_dd[4:]
+    print("NEW YEAR:", yyyy_mm_dd[:4])
+
 retrieve_parameters["date"] = f"{yyyy_mm_dd}/{yyyy_mm_dd}"
 
 start_hh = int(start[11:13])
