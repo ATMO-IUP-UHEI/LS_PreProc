@@ -145,6 +145,14 @@ def merge_era5(era5_ml, era5_sfc, dims):
     max_latitude = min(max(era5_ml.latitude), max(era5_sfc.latitude))
     Nlat = len(era5_ml.latitude.values)
 
+    print("TODO check what happens for negative latitude with test scene")
+
+    # era5 ml data on the western hemisphere comes with longitudes > 180
+    # era5 sfc level data on the western hemisphere comes with longitude < 0
+    # WITH THE SAME API CALL
+    era5_ml["longitude"] = xr.where(
+        era5_ml.longitude >= 180, era5_ml.longitude - 360, era5_ml.longitude)
+
     min_longitude = max(min(era5_ml.longitude), min(era5_sfc.longitude))
     max_longitude = min(max(era5_ml.longitude), max(era5_sfc.longitude))
     Nlon = len(era5_ml.longitude.values)

@@ -74,10 +74,13 @@ c = cdsapi.Client()
 # multilayer
 retrieve_parameters["levtype"] = "ml"
 retrieve_parameters["levelist"] = "1/to/137"
-retrieve_parameters["param"] = "130/133"
+retrieve_parameters["param"] = "130/133/131/132"
 # 130 - temperature / K
 # 133 - specific humidity / kg kg-1
+# 131 - u component of wind / m s-1
+# 132 - v component of wind / m s-1
 output_file = f"../data/era5/download/era5_ml_{yyyymmdd}.grb"
+
 c.retrieve(
     database_name,
     retrieve_parameters,

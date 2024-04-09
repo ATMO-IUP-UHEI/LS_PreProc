@@ -3,12 +3,12 @@
 *.idx
 
 # data should not be included
-module/data/aster/download/*
-module/data/era5/download/*
-module/data/era5/auxiliary/*
-module/data/egg4/download/*
-module/output
+data/aster/download/*
+data/era5/download/*
+data/era5/auxiliary/*
+data/egg4/download/*
+output
 
-module/data/download_scripts/aster/output/*
-module/data/download_scripts/era5/output/*
-module/data/download_scripts/cams/output/*
+data/download_scripts/aster/output/*
+data/download_scripts/era5/output/*
+data/download_scripts/cams/output/*

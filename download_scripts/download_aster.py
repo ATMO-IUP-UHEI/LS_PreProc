@@ -65,8 +65,10 @@ import sys
 import os
 l1b_file = sys.argv[1]
 file_name_list = generate_file_list_from_l1b_file(l1b_file)
-for file_name in file_name_list:
-    if os.path.exists(f"../data/aster/download/{file_name}"):
-        print(f"file {file_name} exists")
-        continue
-    download_files(file_name_list)
+# print(file_name_list)
+# for file_name in file_name_list:
+#     if os.path.exists(f"../data/aster/download/{file_name}"):
+#         print(f"file {file_name} exists")
+#         continue
+#     download_files(file_name_list)
+download_files(file_name_list)
