@@ -11,8 +11,8 @@ from cftime import date2num
 
 
 def import_data(config, dims):
-    l1b = get_data(os.path.join(config["path"], config["l1b"]))
-    l2b = get_data(os.path.join(config["path"], config["l2b"]))
+    l1b = get_data(os.path.join(config["inp_path"], config["l1b"]))
+    l2b = get_data(os.path.join(config["inp_path"], config["l2b"]))
 
     prisma_data = xr.Dataset()
 

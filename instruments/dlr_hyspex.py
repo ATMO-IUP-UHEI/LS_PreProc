@@ -6,7 +6,8 @@ import os
 
 
 def import_data(config, dims):
-    input_data = xr.open_dataset(os.path.join(config["path"], config["l1b"]))
+    input_data = xr.open_dataset(
+        os.path.join(config["inp_path"], config["l1b"]))
 
     dlr_hyspex_data = xr.Dataset()
 

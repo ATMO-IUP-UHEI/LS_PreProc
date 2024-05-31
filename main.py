@@ -1,4 +1,5 @@
 import sys
+import os
 import configparser
 
 from instruments import prisma
@@ -44,12 +45,14 @@ def get_dims():
 def get_data(config, dims):
     match config["instrument"]:
         case "PRISMA":
+            sys.exit("change how input and output path works")
             root, band_list, input_file_list = \
                 prisma.import_data(config, dims)
         case "EnMAP":
             root, band_list, input_file_list = \
                 enmap.import_data(config, dims)
         case "DLR HySpex":
+            sys.exit("change how input and output path works")
             root, band_list, input_file_list = \
                 dlr_hyspex.import_data(config, dims)
         case _:
@@ -165,7 +168,7 @@ def write_data(config, root, band_list, input_file_list):
 
     root.attrs["history"] = history_string
 
-    output_file_name = config["output"]
+    output_file_name = os.path.join("SYNTH_SPECTRA", "L1B_DATA.nc")
 
     for group_num, output_data in enumerate([root, *band_list]):
         for var in output_data.data_vars:

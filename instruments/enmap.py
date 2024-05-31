@@ -12,7 +12,44 @@ from cftime import date2num
 
 
 def import_data(config, dims):
-    meta, vnir, swir = get_data(os.path.join(config["path"], config["tar_gz"]))
+    tile_list = config["tar_gz"].split()
+
+    input_file_list = []
+
+    for i, tile in enumerate(tile_list):
+        input_file_list.append(tile)
+        tar_gz_file_path = os.path.join(config["inp_path"], tile)
+
+        tile_root, tile_band1, tile_band2 = import_tile(tar_gz_file_path, dims)
+
+        if i == 0:
+            root = tile_root
+            band1 = tile_band1
+            band2 = tile_band2
+        else:
+            root = xr.concat(
+                (root, tile_root), dim="frame", data_vars="minimal")
+            band1 = xr.concat(
+                (band1, tile_band1), dim="frame", data_vars="minimal")
+            band2 = xr.concat(
+                (band2, tile_band2), dim="frame", data_vars="minimal")
+
+    # sort by latitude
+    sort_array = root.latitude.mean(dim="line")
+    sort_direction = root.time[1] > root.time[0]
+    root = root.sortby(sort_array, ascending=sort_direction)
+    band1 = band1.sortby(sort_array, ascending=sort_direction)
+    band2 = band2.sortby(sort_array, ascending=sort_direction)
+
+    # shift swir channel
+    band1["radiance"], band1["radiance_noise"] = \
+        shift_swir_channel(band1.radiance, band1.radiance_noise)
+
+    return root, [band1, band2], input_file_list
+
+
+def import_tile(tar_gz_file_path, dims):
+    meta, vnir, swir = get_data(tar_gz_file_path)
 
     enmap_data = xr.Dataset()
 
@@ -53,16 +90,20 @@ def import_data(config, dims):
         dims=(dims["y"], dims["x"]),
     ).astype("float32")
 
-    print("TODO LS: Maybe get surface elevation?")
-
     band1_data = xr.Dataset()
 
-    wavelength, radiance, radiance_noise = get_spectrum(meta, swir, "swir")
+    wavelength, fwhm, radiance, radiance_noise = get_spectrum(
+        meta, swir, "swir")
 
     band1_data["wavelength"] = xr.DataArray(
         data=wavelength,
         dims=(dims["z"]),
     ).astype("float32")
+
+    # band1_data["fwhm"] = xr.DataArray(
+    #     data=fwhm,
+    #     dims=(dims["z"]),
+    # ).astype("float32")
 
     band1_data["radiance"] = xr.DataArray(
         data=radiance,
@@ -76,12 +117,18 @@ def import_data(config, dims):
 
     band2_data = xr.Dataset()
 
-    wavelength, radiance, radiance_noise = get_spectrum(meta, vnir, "vnir")
+    wavelength, fwhm, radiance, radiance_noise = get_spectrum(
+        meta, vnir, "vnir")
 
     band2_data["wavelength"] = xr.DataArray(
         data=wavelength,
         dims=(dims["z"]),
     ).astype("float32")
+
+    # band2_data["fwhm"] = xr.DataArray(
+    #     data=fwhm,
+    #     dims=(dims["z"]),
+    # ).astype("float32")
 
     band2_data["radiance"] = xr.DataArray(
         data=radiance,
@@ -93,25 +140,29 @@ def import_data(config, dims):
         dims=(dims["y"], dims["x"], dims["z"]),
     ).astype("float32")
 
-    band_list = [band1_data, band2_data]
-    input_file_list = [config["tar_gz"]]
-
-    return enmap_data, band_list, input_file_list
+    return enmap_data, band1_data, band2_data
 
 
 def get_data(tar_gz_file_path):
     tar = tarfile.open(tar_gz_file_path)
 
+    zip_file_number = 0
     for content in tar:
-        # Find measurement. It is contained in the only zip file in the archive
-        if not content.name.endswith(".ZIP"):
-            continue
+        if content.name.endswith(".ZIP"):
+            zip_file = content
+            zip_file_number += 1
 
-        # Get the zip file as a binary string and put it into memory,
-        # acting as if it were a file.
-        f = tar.extractfile(content)
-        content = BytesIO(f.read())
-        break
+    if zip_file_number != 1:
+        sys.exit(".tar.gz must contain exactly 1 .zip file. Aborting... "
+                 + "(the folder in which the .tar.gz file is saved should "
+                 + "contain a script to split it into multiple tar files with "
+                 + "one tile each).")
+
+    # The measurement is contained in the only zip file in the archive
+    # Get the zip file as a binary string and put it into memory,
+    # acting as if it were a file.
+    f = tar.extractfile(zip_file)
+    content = BytesIO(f.read())
 
     # Open the .zip file which was previously inside of the .tar.gz file
     zip = zipfile.ZipFile(content)
@@ -364,4 +415,30 @@ def get_spectrum(meta, l1b, spectral_domain):
         radiance_noise * 1e-4 * wavelength * 1e-9 \
         / planck_constant / light_speed
 
-    return wavelength, radiance, radiance_noise
+    return wavelength, fwhm, radiance, radiance_noise
+
+
+def shift_swir_channel(radiance, radiance_noise):
+    # swir data is shifted by roughly 20 spatial pixels, see
+    # https://www.eoportal.org/satellite-missions/enmap#hsi-hyperspectral-imager
+    # Figure 17
+    shift = 20
+
+    shifted_radiance = radiance.copy()
+    shifted_radiance[:-shift, ...] = shifted_radiance[shift:, ...]
+    shifted_radiance[-shift:, ...] = \
+        np.zeros(shape=(
+            shift,
+            shifted_radiance.shape[1],
+            shifted_radiance.shape[2]))
+
+    shifted_radiance_noise = radiance_noise.copy()
+    shifted_radiance_noise[:-shift, ...] = \
+        shifted_radiance_noise[shift:, ...]
+    shifted_radiance_noise[-shift:, ...] = \
+        np.zeros(shape=(
+            shift,
+            shifted_radiance_noise.shape[1],
+            shifted_radiance_noise.shape[2]))
+
+    return shifted_radiance, shifted_radiance_noise
