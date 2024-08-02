@@ -5,7 +5,7 @@ import numpy as np
 import cdsapi
 
 
-l1b_file = sys.argv[1]
+l1b_file = "SYNTH_SPECTRA/L1B_DATA.nc"
 l1b_data = xr.open_dataset(l1b_file)
 
 database_name = "cams-global-ghg-reanalysis-egg4"
@@ -28,7 +28,14 @@ yyyy_mm_dd = start_yyyy_mm_dd
 
 yyyymmdd = "".join(yyyy_mm_dd.split("-"))
 
-override_year = True
+# CAMS data is only available up to 2020. If the data is more recent,
+# take data from the same day and location one year earlier.
+year_of_data = int(yyyy_mm_dd[:4])
+if year_of_data >= 2021:
+    override_year = True
+else:
+    override_year = False
+
 if override_year:
     print("OVERRIDING YEAR")
     print("YEAR OF DATA:", yyyy_mm_dd[:4])
@@ -83,7 +90,7 @@ retrieve_parameters["pressure_level"] = [
     "925", "950", "1000"
 ]
 
-output_file = f"../data/egg4/download/egg4_{yyyymmdd}.grb"
+output_file = f"tmp_preproc_atm/egg4/egg4_{yyyymmdd}.grb"
 
 os.system("cp ~/.cdsapirc_ads ~/.cdsapirc")
 

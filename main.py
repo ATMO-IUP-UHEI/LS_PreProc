@@ -1,5 +1,6 @@
-import sys
 import configparser
+import sys
+import os
 import xarray as xr
 from datetime import datetime
 from cftime import date2num
@@ -10,27 +11,26 @@ import functions.egg4 as egg4
 
 
 def main():
-    try:
-        config_file = sys.argv[1]
-        config = configparser.ConfigParser()
-        config.read(config_file)
-    except IndexError:
-        sys.exit("Provide settings file as command line argument.")
+    config_file = f"{os.path.dirname(__file__)}/config/config.ini"
+    if not os.path.isfile(config_file):
+        sys.exit("no config file provided")
+    config = configparser.ConfigParser()
+    config.read(config_file)
 
     general = config["general"]
     sources = config["sources"]
+    general["auxiliary_path"] = \
+        f"{os.path.dirname(__file__)}/data"
 
     sources = generate_source_list(sources)
+    dims = generate_dims()
 
-    dims = get_dims()
-
-    l1b = xr.open_dataset(f"{general['data_path']}/{general['l1b_file']}")
-
+    l1b = xr.open_dataset("SYNTH_SPECTRA/L1B_DATA.nc")
     atm = create_atm(l1b, dims)
 
     atm = get_data(atm, general, sources, dims)
     atm = set_attributes(atm, dims)
-    write_data(atm, general["output"])
+    write_data(atm)
 
     return
 
@@ -49,15 +49,12 @@ def generate_source_list(variables):
     return sources
 
 
-def get_dims():
-    # documentation see preproc l1b main.py
+def generate_dims():
     dims = {
         "x": "line",
         "y": "frame",
-        # z level is altitude grid
         "z": "level"
     }
-
     return dims
 
 
@@ -78,14 +75,17 @@ def get_data(atm, general, sources, dims):
         # TODO:
         # make sure this only gets the variables that are actually specified
         atm = aster.main(
-            atm, f"{general['auxiliary_path']}/{general['aster_path']}", dims
+            atm,
+            general["aster_path"],
+            dims
         )
     if "era5" in sources:
         # TODO:
         # make sure this only gets the variables that are actually specified
         atm = era5.main(
             atm,
-            f"{general['auxiliary_path']}/{general['era5_path']}",
+            general["auxiliary_path"],
+            general["era5_path"],
             general["nlevel"],
             dims
         )
@@ -94,7 +94,7 @@ def get_data(atm, general, sources, dims):
         # make sure this only gets the variables that are actually specified
         atm = egg4.main(
             atm,
-            f"{general['auxiliary_path']}/{general['egg4_path']}",
+            general["egg4_path"],
             dims
         )
 
@@ -184,7 +184,9 @@ def get_time(atm):
     return time, time_units_string
 
 
-def write_data(atm, output):
+def write_data(atm):
+    output = "SYNTH_SPECTRA/ATM_DATA.nc"
+
     history_string = \
         "Created using the ATM preprocessor for RemoTeC."
 

@@ -4,7 +4,7 @@ import xarray as xr
 import cdsapi
 
 
-l1b_file = sys.argv[1]
+l1b_file = "SYNTH_SPECTRA/L1B_DATA.nc"
 l1b_data = xr.open_dataset(l1b_file)
 
 database_name = "reanalysis-era5-complete"
@@ -79,13 +79,16 @@ retrieve_parameters["param"] = "130/133/131/132"
 # 133 - specific humidity / kg kg-1
 # 131 - u component of wind / m s-1
 # 132 - v component of wind / m s-1
-output_file = f"../data/era5/download/era5_ml_{yyyymmdd}.grb"
+
+output_file_ml = f"tmp_preproc_atm/era5/era5_ml_{yyyymmdd}.grb"
 
 c.retrieve(
     database_name,
     retrieve_parameters,
-    output_file
+    output_file_ml
 )
+
+output_file_sfc = f"tmp_preproc_atm/era5/era5_sfc_{yyyymmdd}.grb"
 
 # surface
 retrieve_parameters["levtype"] = "sfc"
@@ -95,10 +98,9 @@ retrieve_parameters["param"] = "129/134/165/166"
 # 134 - surface pressure / kg m-1 s-2
 # 165 - 10m u-component of wind / m s-1
 # 166 - 10m v-component of wind / m s-1
-output_file = f"../data/era5/download/era5_sfc_{yyyymmdd}.grb"
 
 c.retrieve(
     database_name,
     retrieve_parameters,
-    output_file
+    output_file_sfc
 )

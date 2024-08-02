@@ -7,7 +7,7 @@ from datetime import datetime
 import functions.constants as constants
 
 
-def main(atm, era5_folder_path, nlevel, dims):
+def main(atm, auxiliary_data_path, era5_folder_path, nlevel, dims):
     print(datetime.now(), "getting era5 data")
     # get era5_data from the folder
     # name(s) of the required file will be constructed from the information in
@@ -24,7 +24,7 @@ def main(atm, era5_folder_path, nlevel, dims):
     era5 = merge_era5(era5_ml, era5_sfc, dims)
 
     # calculate pressure grid on era5_levels
-    era5 = calculate_era5_pressure(era5, era5_folder_path)
+    era5 = calculate_era5_pressure(era5, auxiliary_data_path, era5_folder_path)
 
     # calculate geometric altitude
     era5 = calculate_era5_geometric_altitude(atm, era5)
@@ -175,11 +175,12 @@ def merge_era5(era5_ml, era5_sfc, dims):
     return era5
 
 
-def calculate_era5_pressure(era5, era5_folder_path):
+def calculate_era5_pressure(era5, auxiliary_data_path, era5_folder_path):
     # get standard ecmwd atmosphere parameters from file downloaded from
     # https://confluence.ecmwf.int/display/UDOC/L137+model+level+definitions
     try:
-        auxiliary_path = os.path.join(era5_folder_path, "..", "auxiliary")
+        auxiliary_path = os.path.join(
+            auxiliary_data_path, "era5", "auxiliary")
         n, a, b, ph, pf, gpa, gma, t, rho = np.genfromtxt(
             os.path.join(auxiliary_path, "standard_atmosphere.csv"),
             delimiter=",", skip_header=2, unpack=True)
