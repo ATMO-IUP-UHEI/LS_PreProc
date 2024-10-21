@@ -1,6 +1,5 @@
 import sys
 import os
-import configparser
 
 from instruments import prisma
 from instruments import enmap
@@ -9,17 +8,18 @@ from instruments import dlr_hyspex
 
 def main():
     try:
-        config_file = sys.argv[1]
-        config = configparser.ConfigParser()
-        config.read(config_file)
+        instrument_name = sys.argv[1]
+        valid_instruments = ["enmap"]
+        if instrument_name not in valid_instruments:
+            sys.exit(f"{instrument_name} not valid.")
     except IndexError:
-        sys.exit("Provide settings file as command line argument.")
+        sys.exit("Provide instrument name as command line argument."
+                 f"Valid instruments: {valid_instruments}")
 
     dims = get_dims()
-    root, band_list, input_file_list = \
-        get_data(config["config"], dims)
+    root, band_list, input_file_list = get_data(instrument_name, dims)
     set_attributes(root, band_list, dims)
-    write_data(config["config"], root, band_list, input_file_list)
+    write_data(instrument_name, root, band_list, input_file_list)
 
     return
 
@@ -42,21 +42,21 @@ def get_dims():
     return dims
 
 
-def get_data(config, dims):
-    match config["instrument"]:
-        case "PRISMA":
+def get_data(instrument_name, dims):
+    match instrument_name:
+        case "enmap":
+            root, band_list, input_file_list = \
+                enmap.import_data(dims)
+        case "prisma":
             sys.exit("change how input and output path works")
             root, band_list, input_file_list = \
-                prisma.import_data(config, dims)
-        case "EnMAP":
-            root, band_list, input_file_list = \
-                enmap.import_data(config, dims)
-        case "DLR HySpex":
+                prisma.import_data(dims)
+        case "dlr_hyspex":
             sys.exit("change how input and output path works")
             root, band_list, input_file_list = \
-                dlr_hyspex.import_data(config, dims)
+                dlr_hyspex.import_data(dims)
         case _:
-            sys.exit(f"invalid instrument {config['instrument']}")
+            sys.exit(f"invalid instrument {instrument_name}")
 
     return root, band_list, input_file_list
 
@@ -160,10 +160,10 @@ def set_attributes(root, band_list, dims):
                 "photons s-1 cm-2 sr-1 nm-1"
 
 
-def write_data(config, root, band_list, input_file_list):
+def write_data(instrument_name, root, band_list, input_file_list):
     history_string = \
         "Created using the L1B preprocessor for RemoTeC for "\
-        + f"{config['instrument']} data. " \
+        + f"{instrument_name} data. " \
         + f"Used input file(s): {', '.join(input_file_list)}."
 
     root.attrs["history"] = history_string

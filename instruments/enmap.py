@@ -11,14 +11,17 @@ from datetime import timedelta
 from cftime import date2num
 
 
-def import_data(config, dims):
-    tile_list = config["tar_gz"].split()
+def import_data(dims):
+    tile_list = []
+    for file in os.listdir("tmp/spectra"):
+        if file.endswith(".tar.gz"):
+            tile_list.append(file)
 
     input_file_list = []
 
     for i, tile in enumerate(tile_list):
         input_file_list.append(tile)
-        tar_gz_file_path = os.path.join(config["inp_path"], tile)
+        tar_gz_file_path = os.path.join("tmp/spectra", tile)
 
         tile_root, tile_band1, tile_band2 = import_tile(tar_gz_file_path, dims)
 
