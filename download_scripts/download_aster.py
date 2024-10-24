@@ -65,7 +65,7 @@ def download_files(file_name_list):
 
             # download file
             print(f"downloading {file_name}")
-            with open(f"tmp_preproc_atm/aster/{file_name}", "wb") as file:
+            with open(f"tmp/meteo/aster/{file_name}", "wb") as file:
                 file.write(response.content)
 
 

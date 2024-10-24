@@ -80,7 +80,7 @@ retrieve_parameters["param"] = "130/133/131/132"
 # 131 - u component of wind / m s-1
 # 132 - v component of wind / m s-1
 
-output_file_ml = f"tmp_preproc_atm/era5/era5_ml_{yyyymmdd}.grb"
+output_file_ml = f"tmp/meteo/era5/era5_ml_{yyyymmdd}.grb"
 
 c.retrieve(
     database_name,
@@ -88,7 +88,7 @@ c.retrieve(
     output_file_ml
 )
 
-output_file_sfc = f"tmp_preproc_atm/era5/era5_sfc_{yyyymmdd}.grb"
+output_file_sfc = f"tmp/meteo/era5/era5_sfc_{yyyymmdd}.grb"
 
 # surface
 retrieve_parameters["levtype"] = "sfc"

@@ -166,6 +166,18 @@ def set_attributes(atm, dims):
     atm.ch4.attrs["long_name"] = "CH4 mole fraction"
     atm.ch4.attrs["units"] = "mol mol-1"
 
+    assert "wind_u_component" in atm.data_vars
+    assert atm.wind_u_component.dims == (dims["y"], dims["x"], dims["z"])
+    assert atm.wind_u_component.dtype == "float32"
+    atm.wind_u_component.attrs["long_name"] = "u-component of wind speed"
+    atm.wind_u_component.attrs["units"] = "m s-1"
+
+    assert "wind_v_component" in atm.data_vars
+    assert atm.wind_v_component.dims == (dims["y"], dims["x"], dims["z"])
+    assert atm.wind_v_component.dtype == "float32"
+    atm.wind_v_component.attrs["long_name"] = "v-component of wind speed"
+    atm.wind_v_component.attrs["units"] = "m s-1"
+
     return atm
 
 

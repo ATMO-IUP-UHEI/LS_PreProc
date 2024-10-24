@@ -90,7 +90,7 @@ retrieve_parameters["pressure_level"] = [
     "925", "950", "1000"
 ]
 
-output_file = f"tmp_preproc_atm/egg4/egg4_{yyyymmdd}.grb"
+output_file = f"tmp/meteo/egg4/egg4_{yyyymmdd}.grb"
 
 os.system("cp ~/.cdsapirc_ads ~/.cdsapirc")
 

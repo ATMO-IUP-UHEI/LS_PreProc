@@ -73,6 +73,18 @@ def main(atm, auxiliary_data_path, era5_folder_path, nlevel, dims):
     ).astype("float32")
     atm.h2o.attrs["source"] = "era5"
 
+    atm["wind_u_component"] = xr.DataArray(
+        data=era5.wind_u_component.values,
+        dims=(dims["y"], dims["x"], dims["z"])
+    ).astype("float32")
+    atm.wind_u_component.attrs["source"] = "era5"
+
+    atm["wind_v_component"] = xr.DataArray(
+        data=era5.wind_v_component.values,
+        dims=(dims["y"], dims["x"], dims["z"])
+    ).astype("float32")
+    atm.wind_v_component.attrs["source"] = "era5"
+
     return atm
 
 
@@ -107,27 +119,27 @@ def prepare_era5(era5, era5_type):
         era5 = era5.drop(["step", "valid_time"])
         era5 = era5.rename({"hybrid": "era5_level"})
         era5 = era5.drop_vars("era5_level")
-        era5 = era5.rename({"t": "temperature", "q": "specific_humidity"})
+        era5 = era5.rename(
+            {"t": "temperature",
+             "q": "specific_humidity",
+             "u": "wind_u_component",
+             "v": "wind_v_component"})
 
-        era5 = era5.assign(temperature=era5.temperature.astype(np.float32))
         era5 = era5.assign(
-            specific_humidity=era5.specific_humidity.astype(np.float32)
-        )
+            temperature=era5.temperature.astype(np.float32))
+        era5 = era5.assign(
+            specific_humidity=era5.specific_humidity.astype(np.float32))
 
     if era5_type == "sfc":
         era5 = era5.drop(["number", "step", "surface", "valid_time"])
         era5 = era5.rename(
-            {"z": "surface_geopotential", "sp": "surface_pressure"}
-        )
+            {"z": "surface_geopotential",
+             "sp": "surface_pressure"})
 
         era5 = era5.assign(
-            surface_geopotential=era5.surface_geopotential.astype(np.float32)
-        )
+            surface_geopotential=era5.surface_geopotential.astype(np.float32))
         era5 = era5.assign(
-            surface_pressure=era5.surface_pressure.astype(np.float32)
-        )
-        era5 = era5.assign(u10=era5.u10.astype(np.float32))
-        era5 = era5.assign(v10=era5.v10.astype(np.float32))
+            surface_pressure=era5.surface_pressure.astype(np.float32))
 
     return era5
 
@@ -144,8 +156,6 @@ def merge_era5(era5_ml, era5_sfc, dims):
     min_latitude = max(min(era5_ml.latitude), min(era5_sfc.latitude))
     max_latitude = min(max(era5_ml.latitude), max(era5_sfc.latitude))
     Nlat = len(era5_ml.latitude.values)
-
-    print("TODO check what happens for negative latitude with test scene")
 
     # era5 ml data on the western hemisphere comes with longitudes > 180
     # era5 sfc level data on the western hemisphere comes with longitude < 0
@@ -270,6 +280,8 @@ def correct_surface_elevation(atm, era5):
     above_ground = era5.geometric_altitude >= atm.surface_elevation
     era5["pressure"] = era5.pressure.where(above_ground)
     era5["temperature"] = era5.temperature.where(above_ground)
+    era5["wind_u_component"] = era5.wind_u_component.where(above_ground)
+    era5["wind_v_component"] = era5.wind_v_component.where(above_ground)
     era5["geometric_altitude"] = era5.geometric_altitude.where(above_ground)
     era5["h2o"] = era5.h2o.where(above_ground)
 
@@ -298,6 +310,12 @@ def correct_surface_elevation(atm, era5):
         * elevation_difference
 
     # era5.specific_humidity[..., ground_level] is assumed to have a constant
+    # profile, no change necessary
+
+    # era5.wind_u_component[..., ground_level] is assumed to have a constant
+    # profile, no change necessary
+
+    # era5.wind_v_component[..., ground_level] is assumed to have a constant
     # profile, no change necessary
 
     return era5
@@ -346,7 +364,8 @@ def interpolate_era5_onto_pressure_grid(atm, era5, nlevel, dims):
     # dimension into 3 coordinates, not what we want.
     # Finding an efficient way to do this will save the bulk of the calculation
     # time, sadly. This is super slow.
-    for variable in ["pressure", "temperature", "geometric_altitude", "h2o"]:
+    for variable in ["pressure", "temperature", "geometric_altitude", "h2o",
+                     "wind_u_component", "wind_v_component"]:
         variable_array = np.empty(shape=(Ny, Nx, Nz), dtype="float32")
         for y in range(Ny):
             for x in range(Nx):
