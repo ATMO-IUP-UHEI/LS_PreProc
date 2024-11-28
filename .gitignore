@@ -2,13 +2,5 @@
 *.DS_Store
 *.idx
 
-# data should not be included
-data/aster/download/*
-data/era5/download/*
-data/era5/auxiliary/*
-data/egg4/download/*
-output
-
-data/download_scripts/aster/output/*
-data/download_scripts/era5/output/*
-data/download_scripts/cams/output/*
+todo
+todo_old
