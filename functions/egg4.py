@@ -165,37 +165,44 @@ def interpolate_egg4_onto_atm(atm, egg4, dims):
 
 
 def interpolate_egg4_onto_pressure_grid(atm, egg4, dims):
-    Nx = len(atm[dims["x"]])
-    Ny = len(atm[dims["y"]])
-    Nz = len(atm[dims["z"]])
+    new_pressure_grid = atm.pressure
+    old_pressure_grid = egg4.pressure
 
-    for variable in ["co2", "ch4"]:
-        variable_array = np.empty(shape=(Ny, Nx, Nz), dtype="float32")
-        for y in range(Ny):
-            for x in range(Nx):
-                variable_array[y, x, :] = \
-                    egg4[variable][y, x, :].interp(
-                        pressure=atm.pressure[y, x, :]
-                    )
+    # perform interpolation
+    egg4_interpolated = xr.apply_ufunc(
+        interpolate_pressures,
+        new_pressure_grid, old_pressure_grid, egg4,
+        input_core_dims=[["level"], ["pressure"], ["pressure"]],
+        output_core_dims=[["level"]],
+        vectorize=True
+    )
 
-                # If the atm pressure grid doesn't surround the egg4
-                # pressure grid, there will be nan values at the boundaries.
-                # Extrapolate vertical profiles constantly upwards and
-                # downwards by overwriting all nan values with nearest
-                # neighbor.
-                non_nan = np.where(~np.isnan(variable_array[y, x, :]))[0]
-                first_value = non_nan[0]
-                last_value = non_nan[-1]
+    return egg4_interpolated
 
-                variable_array[y, x, :first_value] = \
-                    variable_array[y, x, first_value]
-                variable_array[y, x, last_value:] = \
-                    variable_array[y, x, last_value]
 
-        egg4.drop(variable)
-        egg4[variable] = xr.DataArray(
-            data=variable_array,
-            dims=(dims["y"], dims["x"], dims["z"])
-        ).astype("float32")
+def interpolate_pressures(new_pressure_array, old_pressure_array, egg4):
+    # If the atm pressure grid doesn't surround the egg4
+    # pressure grid, there will be nan values at the boundaries.
+    # Extrapolate vertical profiles constantly upwards and
+    # downwards by overwriting all nan values with nearest
+    # neighbor.
 
-    return egg4
+    # Perform interpolation.
+    # interpolation has problems if the order of the pressure
+    # grids does not align, therefore flip.
+    egg4_interpolated = np.interp(
+        new_pressure_array, old_pressure_array[::-1], egg4[::-1],
+        left=np.nan, right=np.nan
+    )
+
+    # If old grid doesn't surround new grid, we have nans.
+    # extrapolate them constantly
+    valid_mask = ~np.isnan(egg4_interpolated)
+    if False in valid_mask:
+        left = np.where(valid_mask)[0][0]
+        right = np.where(valid_mask)[0][-1]
+
+        egg4_interpolated[:left] = egg4_interpolated[left]
+        egg4_interpolated[right:] = egg4_interpolated[right]
+
+    return egg4_interpolated

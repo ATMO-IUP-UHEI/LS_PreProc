@@ -322,64 +322,86 @@ def correct_surface_elevation(atm, era5):
 
 
 def interpolate_era5_onto_pressure_grid(atm, era5, nlevel, dims):
-    nlevel = int(nlevel)
+    Nframe = atm.sizes["frame"]
+    Nline = atm.sizes["line"]
+    Nlevel_new = int(nlevel)
 
-    old_level_grid = np.tile(
-        era5.era5_level.values, (len(atm[dims["y"]]), len(atm[dims["x"]]), 1)
-    )
-    old_pressure_grid = era5.pressure.values
+    # this function will interpolate era5 data from the era5_level grid onto
+    # the level grid. Since the data has the dimension "level" and we want to
+    # interpolate according to the pressure, which is just a member variable,
+    # we have to do a complicated detour.
+    # The new pseudo-levels that will be interpolated to will be calculated re-
+    # lative to the era5_level grid according to the pressures. The pseudo-
+    # levels may be non-integers. Afterwards, the new pseudolevels are declared
+    # as levels 1 - nlevel.
 
-    new_min_pressure = \
-        era5.pressure.min(dim="era5_level", skipna=True)
-    new_max_pressure = \
-        era5.pressure.max(dim="era5_level", skipna=True)
+    # get new pseudo-level grid
 
-    new_pressure_grid = np.linspace(new_min_pressure, new_max_pressure, nlevel)
-    new_pressure_grid = np.moveaxis(new_pressure_grid, [0, 1, 2], [2, 0, 1])
-
-    # something like this would be cool but doesn't exist for 3D grids
-    # new_level_grid = \
-    #     np.interp(new_pressure_grid, old_pressure_grid, old_level_grid)
-    Nx = len(atm[dims["x"]])
-    Ny = len(atm[dims["y"]])
-    Nz = nlevel
-
-    new_level_grid = np.empty(shape=new_pressure_grid.shape)
-    for y in range(Ny):
-        for x in range(Nx):
-            new_level_grid[y, x, :] = np.interp(
-                new_pressure_grid[y, x, :],
-                old_pressure_grid[y, x, :],
-                old_level_grid[y, x, :]
-            )
-
-    new_level_grid = xr.DataArray(
-        data=new_level_grid,
-        dims=(dims["y"], dims["x"], dims["z"])
+    old_level_grid = xr.DataArray(
+        data=np.tile(era5.era5_level.values, (Nframe, Nline, 1)),
+        dims=["frame", "line", "era5_level"]
     ).astype("float32")
 
-    # something like this would be cool but doesn't exist for 3D grids
-    # era5 = era5.interp(era5_level=new_level_grid)
-    # instead of doing a 3D interpolation, it tries to split the era5_level
-    # dimension into 3 coordinates, not what we want.
-    # Finding an efficient way to do this will save the bulk of the calculation
-    # time, sadly. This is super slow.
-    for variable in ["pressure", "temperature", "geometric_altitude", "h2o",
-                     "wind_u_component", "wind_v_component"]:
-        variable_array = np.empty(shape=(Ny, Nx, Nz), dtype="float32")
-        for y in range(Ny):
-            for x in range(Nx):
-                data = era5[variable].isel(frame=y, line=x)
-                level = new_level_grid[y, x, :]
-                variable_array[y, x, :] = data.interp(era5_level=level)
+    old_pressure_grid = era5.pressure
 
-        era5 = era5.drop(variable)
+    new_min_pressure = era5.pressure.min(dim="era5_level", skipna=True)
+    new_max_pressure = era5.pressure.max(dim="era5_level", skipna=True)
+    new_pressure_grid = np.linspace(
+        new_min_pressure, new_max_pressure, Nlevel_new)
+    new_pressure_grid = np.moveaxis(new_pressure_grid, [0, 1, 2], [2, 0, 1])
+    new_pressure_grid = xr.DataArray(
+        data=new_pressure_grid,
+        dims=["frame", "line", "level"]
+    ).astype("float32")
 
-        era5[variable] = xr.DataArray(
-            data=variable_array,
-            dims=(dims["y"], dims["x"], dims["z"])
-        ).astype("float32")
+    new_level_grid = xr.apply_ufunc(
+        get_new_level_array,
+        new_pressure_grid, old_pressure_grid, old_level_grid,
+        input_core_dims=[["level"], ["era5_level"], ["era5_level"]],
+        output_core_dims=[["level"]],
+        vectorize=True
+    )
 
-        variable_array = None
+    # Variables that have "era5_level" (need interpolation)
+    vars_with_levels = [
+        var for var in era5.data_vars if "era5_level" in era5[var].dims]
+    era5_level_vars = era5[vars_with_levels]
 
-    return era5
+    # Variables without "era5_level" (should be copied directly)
+    vars_without_levels = [
+        var for var in era5.data_vars if "era5_level" not in era5[var].dims]
+    era5_surface_vars = era5[vars_without_levels]
+
+    # Interpolate variables with level information
+    era5_level_vars_interpolated = xr.apply_ufunc(
+        interpolate_levels,
+        new_level_grid, old_level_grid, era5_level_vars,
+        input_core_dims=[["level"], ["era5_level"], ["era5_level"]],
+        output_core_dims=[["level"]],
+        vectorize=True
+    )
+
+    era5_interpolated = xr.merge(
+        [era5_level_vars_interpolated, era5_surface_vars]
+    )
+
+    return era5_interpolated
+
+
+def get_new_level_array(new_pressure_array,
+                        old_pressure_array,
+                        old_level_array):
+    new_level_array = np.interp(
+        new_pressure_array, old_pressure_array, old_level_array)
+
+    return new_level_array
+
+
+def get_variable_array(data_array, level_array):
+    variable_array = data_array.interp(era5_level=level_array)
+
+    return variable_array
+
+
+def interpolate_levels(new_level_array, old_level_array, era5):
+    return np.interp(new_level_array, old_level_array, era5)
