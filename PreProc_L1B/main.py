@@ -1,5 +1,6 @@
 import sys
 import os
+import time
 
 from instruments import prisma
 from instruments import enmap
@@ -16,10 +17,15 @@ def main():
         sys.exit("Provide instrument name as command line argument."
                  f"Valid instruments: {valid_instruments}")
 
+    start_time = time.time()
+
     dims = get_dims()
     root, band_list, input_file_list = get_data(instrument_name, dims)
     set_attributes(root, band_list, dims)
     write_data(instrument_name, root, band_list, input_file_list)
+
+    stop_time = time.time()
+    print(f"Total runtime: {stop_time - start_time:.2f} s.")
 
     return
 

@@ -3,6 +3,7 @@ import sys
 import os
 import xarray as xr
 from datetime import datetime
+import time
 from cftime import date2num
 
 import functions.aster as aster
@@ -16,6 +17,8 @@ def main():
         sys.exit("no config file provided")
     config = configparser.ConfigParser()
     config.read(config_file)
+
+    start_time = time.time()
 
     general = config["general"]
     sources = config["sources"]
@@ -31,6 +34,9 @@ def main():
     atm = get_data(atm, general, sources, dims)
     atm = set_attributes(atm, dims)
     write_data(atm)
+
+    stop_time = time.time()
+    print(f"Total runtime: {stop_time - start_time:.2f} s.")
 
     return
 

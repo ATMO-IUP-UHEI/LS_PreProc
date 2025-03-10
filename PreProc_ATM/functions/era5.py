@@ -40,11 +40,7 @@ def main(atm, auxiliary_data_path, era5_folder_path, nlevel, dims):
     era5 = correct_surface_elevation(atm, era5)
 
     # interpolate era5 pressure grid onto new pressure grid
-    import time
-    start = time.time()
     era5 = interpolate_era5_onto_pressure_grid(atm, era5, nlevel, dims)
-    end = time.time()
-    print(f"inefficient part of era5: {end - start} s.")
 
     atm["pressure"] = xr.DataArray(
         data=era5.pressure.values,

@@ -32,11 +32,7 @@ def main(atm, egg4_folder_path, dims):
     egg4 = interpolate_egg4_onto_atm(atm, egg4, dims)
 
     # interpolate egg4 to atm pressure grid
-    import time
-    start = time.time()
     egg4 = interpolate_egg4_onto_pressure_grid(atm, egg4, dims)
-    end = time.time()
-    print(f"inefficient part of egg4: {end - start} s.")
 
     atm["co2"] = xr.DataArray(
         data=egg4.co2.values,
