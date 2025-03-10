@@ -1,0 +1,9 @@
+#!/bin/bash
+#SBATCH --partition=cpu-single       # Partition (change if needed)
+#SBATCH --ntasks=1                   # Number of tasks (1 process)
+#SBATCH --time=01:00:00              # Time limit (HH:MM:SS)
+#SBATCH --mem=32G                    # Memory required
+#SBATCH --job-name=PreProc_ATM       # Job name
+#SBATCH --output=preproc_atm.log     # Log file (stores stdout/stderr)
+#SBATCH --error=preproc_atm.log      # Error file (if errors occur)
+python3 ~/sds/software/RemoTeC_preproc/RemoTeC_PreProc_ATM/main.py
