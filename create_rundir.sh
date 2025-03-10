@@ -9,3 +9,6 @@ mkdir $1/tmp/meteo
 mkdir $1/tmp/meteo/aster
 mkdir $1/tmp/meteo/egg4
 mkdir $1/tmp/meteo/era5
+mkdir $1/slurm
+mkdir $1/slurm/preproc
+mkdir $1/slurm/run_remotec
