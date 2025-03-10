@@ -6,4 +6,4 @@
 #SBATCH --job-name=PreProc_L1B       # Job name
 #SBATCH --output=preproc_l1b.log     # Log file (stores stdout/stderr)
 #SBATCH --error=preproc_l1b.log      # Error file (if errors occur)
-python3 ~/sds/software/RemoTeC_preproc/RemoTeC_PreProc_L1B/main.py $1
+python3 ~/sds/software/PreProc/PreProc_L1B/main.py $1
