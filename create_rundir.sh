@@ -1,0 +1,11 @@
+mkdir $1
+mkdir $1/CONTRL_OUT
+mkdir $1/INI
+mkdir $1/LST
+mkdir $1/SYNTH_SPECTRA
+mkdir $1/tmp
+mkdir $1/tmp/spectra
+mkdir $1/tmp/meteo
+mkdir $1/tmp/meteo/aster
+mkdir $1/tmp/meteo/egg4
+mkdir $1/tmp/meteo/era5
