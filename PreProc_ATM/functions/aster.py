@@ -4,7 +4,7 @@ from datetime import datetime
 
 
 def main(atm, aster_folder_path, dims):
-    print(datetime.now(), "getting aster data")
+    print(datetime.now(), "getting aster data.")
     # get aster data from the folder.
     # name(s) of the required file will be constructed from the coordinates in
     # atm_data.

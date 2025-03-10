@@ -6,7 +6,7 @@ import functions.constants as constants
 
 
 def main(atm, egg4_folder_path, dims):
-    print(datetime.now(), "getting egg4 data")
+    print(datetime.now(), "getting egg4 data.")
     # get egg4 from the folder.
     # name(s) of the required file will be constructed from the information in
     # atm

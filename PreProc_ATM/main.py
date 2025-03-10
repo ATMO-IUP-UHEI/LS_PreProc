@@ -18,8 +18,6 @@ def main():
     config = configparser.ConfigParser()
     config.read(config_file)
 
-    start_time = time.time()
-
     general = config["general"]
     sources = config["sources"]
     general["auxiliary_path"] = \
@@ -34,9 +32,6 @@ def main():
     atm = get_data(atm, general, sources, dims)
     atm = set_attributes(atm, dims)
     write_data(atm)
-
-    stop_time = time.time()
-    print(f"Total runtime: {stop_time - start_time:.2f} s.")
 
     return
 
@@ -221,8 +216,7 @@ def write_data(atm):
 
 
 if __name__ == "__main__":
-    import time
-    start = time.time()
+    start_time = time.time()
     main()
-    end = time.time()
-    print(f"total elapsed time:       {end - start} s.")
+    stop_time = time.time()
+    print(f"Total runtime: {stop_time - start_time:.2f} s.")

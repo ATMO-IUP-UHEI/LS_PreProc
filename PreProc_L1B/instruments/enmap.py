@@ -12,6 +12,7 @@ from cftime import date2num
 
 
 def import_data(dims):
+    print(datetime.now(), "getting enmap data.")
     tile_list = []
     for file in os.listdir("tmp/spectra"):
         if file.endswith(".tar.gz"):

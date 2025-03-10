@@ -8,7 +8,7 @@ import functions.constants as constants
 
 
 def main(atm, auxiliary_data_path, era5_folder_path, nlevel, dims):
-    print(datetime.now(), "getting era5 data")
+    print(datetime.now(), "getting era5 data.")
     # get era5_data from the folder
     # name(s) of the required file will be constructed from the information in
     # atm
