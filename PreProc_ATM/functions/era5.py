@@ -340,8 +340,10 @@ def interpolate_era5_onto_pressure_grid(atm, era5, nlevel, dims):
 
     old_pressure_grid = era5.pressure
 
+    # new pressure grid. include a small boundary fix for the maximum for
+    # interpolation. necessary due to floating point precision
     new_min_pressure = era5.pressure.min(dim="era5_level", skipna=True)
-    new_max_pressure = era5.pressure.max(dim="era5_level", skipna=True)
+    new_max_pressure = era5.pressure.max(dim="era5_level", skipna=True) - 0.1
     new_pressure_grid = np.linspace(
         new_min_pressure, new_max_pressure, Nlevel_new)
     new_pressure_grid = np.moveaxis(new_pressure_grid, [0, 1, 2], [2, 0, 1])
@@ -357,6 +359,12 @@ def interpolate_era5_onto_pressure_grid(atm, era5, nlevel, dims):
         output_core_dims=[["level"]],
         vectorize=True
     )
+
+    if new_level_grid.isnull().sum() != 0:
+        print("ERROR: nans in new_level grid")
+        print("       check boundary fix")
+        print("       exiting ...")
+        sys.exit()
 
     # Variables that have "era5_level" (need interpolation)
     vars_with_levels = [
