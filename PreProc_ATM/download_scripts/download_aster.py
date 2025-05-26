@@ -50,7 +50,7 @@ def download_files(file_name_list):
 
         for file_name in file_name_list:
             file_url = "https://data.lpdaac.earthdatacloud.nasa.gov/"\
-                     + f"lp-prod-protected/ASTGTM.003/{file_name}"
+                + f"lp-prod-protected/ASTGTM.003/{file_name}"
 
             # verify login works
             response = session.get(file_url)
