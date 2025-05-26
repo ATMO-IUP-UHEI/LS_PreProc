@@ -9,14 +9,12 @@ def main(atm, aster_folder_path, dims):
     # name(s) of the required file will be constructed from the coordinates in
     # atm_data.
     aster = get_aster_data(atm, aster_folder_path)
-    # drop unnecessary variables from aster_data and rename needed ones
-    aster = prepare_aster_data(aster)
 
     # interpolation of aster_data onto atm grid
-    aster = aster.interp(
-        latitude=atm.latitude,
-        longitude=atm.longitude
-    )
+    # aster = aster.interp(
+    #     latitude=atm.latitude,
+    #     longitude=atm.longitude
+    # )
 
     atm["surface_elevation"] = xr.DataArray(
         data=get_surface_elevation(aster),
@@ -36,6 +34,19 @@ def get_aster_data(atm_data, aster_folder_path):
     for file_name in file_name_list:
         tmp_data = xr.open_dataset(
             f"{aster_folder_path}/{file_name}", engine="rasterio"
+        )
+
+        # drop unnecessary variables from aster_data and rename needed ones
+        tmp_data = prepare_aster_data(tmp_data)
+
+        # Interpolate onto atm grid for merge purposes. This has to be done
+        # as not all ASTER tiles will have matching coordinates, e.g. the
+        # manually created ones for tiles above water will not properly merge
+        # with successfully downloaded tiles due to floating point errors.
+        # Another (probably redundant) interpolation will be made later.
+        tmp_data = tmp_data.interp(
+            latitude=atm_data.latitude,
+            longitude=atm_data.longitude
         )
 
         if not aster_data_set:
