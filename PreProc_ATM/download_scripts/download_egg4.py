@@ -79,7 +79,10 @@ if max_longitude - min_longitude >= 180:
     sys.exit("measurement wraps around back of Earth?")
 
 retrieve_parameters["area"] = [
-    max_latitude, min_longitude, min_latitude, max_longitude
+    str(max_latitude),
+    str(min_longitude),
+    str(min_latitude),
+    str(max_longitude)
 ]
 
 retrieve_parameters["format"] = "grib"
