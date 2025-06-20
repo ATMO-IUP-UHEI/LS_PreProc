@@ -1,3 +1,4 @@
+import configparser
 import sys
 import os
 import time
@@ -5,21 +6,32 @@ import time
 from instruments import prisma
 from instruments import enmap
 from instruments import dlr_hyspex
-
+from instruments import emit
 
 def main():
+
     try:
         instrument_name = sys.argv[1]
-        valid_instruments = ["enmap"]
+        valid_instruments = ["enmap","emit"]
         if instrument_name not in valid_instruments:
             sys.exit(f"{instrument_name} not valid.")
     except IndexError:
         sys.exit("Provide instrument name as command line argument."
                  f"Valid instruments: {valid_instruments}")
 
+    config_file =\
+        os.path.join(os.path.split(os.path.abspath(__file__))[0],\
+        "config/","".join([instrument_name,".ini"]))
+    if not os.path.isfile(config_file):
+        sys.exit("no config file provided")
+    config = configparser.ConfigParser()
+    config.read(config_file)
+
     dims = get_dims()
-    root, band_list, input_file_list = get_data(instrument_name, dims)
+    root, band_list, input_file_list = get_data(instrument_name, config, dims)
+    
     set_attributes(root, band_list, dims)
+    
     write_data(instrument_name, root, band_list, input_file_list)
 
     return
@@ -43,7 +55,7 @@ def get_dims():
     return dims
 
 
-def get_data(instrument_name, dims):
+def get_data(instrument_name, config, dims):
     match instrument_name:
         case "enmap":
             root, band_list, input_file_list = \
@@ -56,6 +68,10 @@ def get_data(instrument_name, dims):
             sys.exit("change how input and output path works")
             root, band_list, input_file_list = \
                 dlr_hyspex.import_data(dims)
+        case "emit":
+            root, band_list, input_file_list = \
+                emit.import_data(config, dims)
+  
         case _:
             sys.exit(f"invalid instrument {instrument_name}")
 
@@ -159,9 +175,10 @@ def set_attributes(root, band_list, dims):
                 "realization of Gaussian noise added onto synthetic radiance"
             band.radiance_error.attrs["units"] = \
                 "photons s-1 cm-2 sr-1 nm-1"
-
+        
 
 def write_data(instrument_name, root, band_list, input_file_list):
+    
     history_string = \
         "Created using the L1B preprocessor for RemoTeC for "\
         + f"{instrument_name} data. " \
@@ -188,8 +205,7 @@ def write_data(instrument_name, root, band_list, input_file_list):
                 format="NETCDF4",
                 group=f"BAND{group_num:02}"
             )
-
-
+       
 if __name__ == "__main__":
     start_time = time.time()
     main()

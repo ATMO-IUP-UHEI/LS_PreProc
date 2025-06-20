@@ -81,26 +81,35 @@ retrieve_parameters["param"] = "130/133/131/132"
 # 132 - v component of wind / m s-1
 
 output_file_ml = f"tmp/meteo/era5/era5_ml_{yyyymmdd}.grb"
+if os.path.exists(output_file_ml):
 
-c.retrieve(
-    database_name,
-    retrieve_parameters,
-    output_file_ml
-)
+    print("download_era5.py: file exists!", output_file_ml)
+
+else:
+    c.retrieve(
+        database_name,
+        retrieve_parameters,
+        output_file_ml
+    )
 
 output_file_sfc = f"tmp/meteo/era5/era5_sfc_{yyyymmdd}.grb"
+if os.path.exists(output_file_sfc):
 
-# surface
-retrieve_parameters["levtype"] = "sfc"
-retrieve_parameters["levelist"] = "1"
-retrieve_parameters["param"] = "129/134/165/166"
-# 129 - geopotential / m2 s-2
-# 134 - surface pressure / kg m-1 s-2
-# 165 - 10m u-component of wind / m s-1
-# 166 - 10m v-component of wind / m s-1
+    print("download_era5.py: file exists!", output_file_sfc)
 
-c.retrieve(
-    database_name,
-    retrieve_parameters,
-    output_file_sfc
-)
+else:
+    
+    # surface
+    retrieve_parameters["levtype"] = "sfc"
+    retrieve_parameters["levelist"] = "1"
+    retrieve_parameters["param"] = "129/134/165/166"
+    # 129 - geopotential / m2 s-2
+    # 134 - surface pressure / kg m-1 s-2
+    # 165 - 10m u-component of wind / m s-1
+    # 166 - 10m v-component of wind / m s-1
+
+    c.retrieve(
+        database_name,
+        retrieve_parameters,
+        output_file_sfc
+    )

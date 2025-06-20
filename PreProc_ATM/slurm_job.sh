@@ -6,4 +6,4 @@
 #SBATCH --job-name=PreProc_ATM         # Job name
 #SBATCH --output=slurm/preproc/atm.log # Log file (stores stdout/stderr)
 #SBATCH --error=slurm/preproc/atm.log  # Error file (if errors occur)
-python3 ~/sds/software/PreProc/PreProc_ATM/main.py
+python /home/hd/hd_hd/hd_oc152/software/RemoTeC/bin/PreProc_ATM/main.py

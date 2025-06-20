@@ -1,3 +1,4 @@
+import os
 import sys
 import xarray as xr
 import numpy as np
@@ -57,38 +58,44 @@ def download_files(file_name_list):
         session.headers = {"Authorization": f"Bearer {token}"}
 
         for file_name in file_name_list:
-            file_url = "https://data.lpdaac.earthdatacloud.nasa.gov/"\
-                + f"lp-prod-protected/ASTGTM.003/{file_name}"
+            output_file = f"tmp/meteo/aster/{file_name}"
+            if os.path.exists(output_file):
 
-            # verify login works
-            response = session.get(file_url)
-            match response.status_code:
-                case HTTPStatus.UNAUTHORIZED:
-                    print("not authorized. maybe you entered the wrong token "
-                          + "or your token expired?")
-                    sys.exit()
-                case HTTPStatus.NOT_FOUND:
-                    print("url not found.")
+               print("download_aster.py: file exists!", output_file)
 
-                    above_water = confirm_tile_above_water(file_name)
-                    if not above_water:
-                        sys.exit("Tile is not above water but data doesn't "
-                                 + "exist. Some error must have occured. "
-                                 + "Exiting...")
+            else:
+                file_url = "https://data.lpdaac.earthdatacloud.nasa.gov/"\
+                    + f"lp-prod-protected/ASTGTM.003/{file_name}"
 
-                    # If tile is fully above water, there will be no data
-                    # for it in the ASTER data base. Therefore, we create
-                    # our own tile object with zeros in every entry.
-                    create_tile_with_zeros(
-                        file_name, f"tmp/meteo/aster/{file_name}")
-                    continue
-            if not HTTPStatus.OK:
-                sys.exit("HTTPStatus is not OK.")
+                # verify login works
+                response = session.get(file_url)
+                match response.status_code:
+                    case HTTPStatus.UNAUTHORIZED:
+                        print("not authorized. maybe you entered the wrong token "
+                              + "or your token expired?")
+                        sys.exit()
+                    case HTTPStatus.NOT_FOUND:
+                        print("url not found.")
 
-            # download file
-            print(f"downloading {file_name}")
-            with open(f"tmp/meteo/aster/{file_name}", "wb") as file:
-                file.write(response.content)
+                        above_water = confirm_tile_above_water(file_name)
+                        if not above_water:
+                            sys.exit("Tile is not above water but data doesn't "
+                                     + "exist. Some error must have occured. "
+                                     + "Exiting...")
+
+                        # If tile is fully above water, there will be no data
+                        # for it in the ASTER data base. Therefore, we create
+                        # our own tile object with zeros in every entry.
+                        create_tile_with_zeros(
+                            file_name, f"tmp/meteo/aster/{file_name}")
+                        continue
+                if not HTTPStatus.OK:
+                    sys.exit("HTTPStatus is not OK.")
+
+                # download file
+                print(f"downloading {file_name}")
+                with open(f"tmp/meteo/aster/{file_name}", "wb") as file:
+                    file.write(response.content)
 
 
 def confirm_tile_above_water(file_name):
