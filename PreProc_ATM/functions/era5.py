@@ -163,8 +163,8 @@ def merge_era5(era5_ml, era5_sfc, dims):
     max_longitude = min(max(era5_ml.longitude), max(era5_sfc.longitude))
     Nlon = len(era5_ml.longitude.values)
 
-    new_latitude = np.linspace(min_latitude, max_latitude, Nlat)
-    new_longitude = np.linspace(min_longitude, max_longitude, Nlon)
+    new_latitude = np.linspace(min_latitude.values, max_latitude.values, Nlat)
+    new_longitude = np.linspace(min_longitude.values, max_longitude.values, Nlon)
 
     era5_ml = era5_ml.interp(
         latitude=new_latitude,
@@ -342,8 +342,8 @@ def interpolate_era5_onto_pressure_grid(atm, era5, nlevel, dims):
 
     # new pressure grid. include a small boundary fix for the maximum for
     # interpolation. necessary due to floating point precision
-    new_min_pressure = era5.pressure.min(dim="era5_level", skipna=True)
-    new_max_pressure = era5.pressure.max(dim="era5_level", skipna=True) - 0.1
+    new_min_pressure = era5.pressure.min(dim="era5_level", skipna=True).values
+    new_max_pressure = era5.pressure.max(dim="era5_level", skipna=True).values - 0.1
     new_pressure_grid = np.linspace(
         new_min_pressure, new_max_pressure, Nlevel_new)
     new_pressure_grid = np.moveaxis(new_pressure_grid, [0, 1, 2], [2, 0, 1])
