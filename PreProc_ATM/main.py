@@ -179,6 +179,18 @@ def set_attributes(atm, dims):
     atm.wind_v_component.attrs["long_name"] = "v-component of wind speed"
     atm.wind_v_component.attrs["units"] = "m s-1"
 
+    assert "wind_u_component_10m" in atm.data_vars
+    assert atm.wind_u_component_10m.dims == (dims["y"], dims["x"])
+    assert atm.wind_u_component_10m.dtype == "float32"
+    atm.wind_u_component_10m.attrs["long_name"] = "u-component of 10m wind speed"
+    atm.wind_u_component_10m.attrs["units"] = "m s-1"
+
+    assert "wind_v_component_10m" in atm.data_vars
+    assert atm.wind_v_component_10m.dims == (dims["y"], dims["x"])
+    assert atm.wind_v_component_10m.dtype == "float32"
+    atm.wind_v_component_10m.attrs["long_name"] = "v-component of 10m wind speed"
+    atm.wind_v_component_10m.attrs["units"] = "m s-1"
+
     return atm
 
 

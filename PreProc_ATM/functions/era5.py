@@ -81,6 +81,18 @@ def main(atm, auxiliary_data_path, era5_folder_path, nlevel, dims):
     ).astype("float32")
     atm.wind_v_component.attrs["source"] = "era5"
 
+    atm["wind_u_component_10m"] = xr.DataArray(
+        data=era5.wind_u_component_10m.values,
+        dims=(dims["y"], dims["x"])
+    ).astype("float32")
+    atm.wind_u_component.attrs["source"] = "era5"
+
+    atm["wind_v_component_10m"] = xr.DataArray(
+        data=era5.wind_v_component_10m.values,
+        dims=(dims["y"], dims["x"])
+    ).astype("float32")
+    atm.wind_v_component.attrs["source"] = "era5"
+
     return atm
 
 
@@ -130,12 +142,18 @@ def prepare_era5(era5, era5_type):
         era5 = era5.drop(["number", "step", "surface", "valid_time"])
         era5 = era5.rename(
             {"z": "surface_geopotential",
-             "sp": "surface_pressure"})
+             "sp": "surface_pressure",
+             "u10": "wind_u_component_10m",
+             "v10": "wind_v_component_10m"})
 
         era5 = era5.assign(
             surface_geopotential=era5.surface_geopotential.astype(np.float32))
         era5 = era5.assign(
             surface_pressure=era5.surface_pressure.astype(np.float32))
+        era5 = era5.assign(
+            wind_u_component_10m=era5.wind_u_component_10m.astype(np.float32))
+        era5 = era5.assign(
+            wind_v_component_10m=era5.wind_v_component_10m.astype(np.float32))
 
     return era5
 
