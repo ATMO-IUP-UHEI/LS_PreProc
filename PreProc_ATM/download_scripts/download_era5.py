@@ -2,9 +2,10 @@ import sys
 import os
 import xarray as xr
 import cdsapi
+from datetime import datetime as date
+from dateutil.relativedelta import relativedelta
 
-
-l1b_file = "SYNTH_SPECTRA/L1B_DATA.nc"
+l1b_file = "DATA_IN/L1B_DATA.nc"
 l1b_data = xr.open_dataset(l1b_file)
 
 database_name = "reanalysis-era5-complete"
@@ -39,6 +40,22 @@ if not start_yyyy_mm_dd == stop_yyyy_mm_dd:
     sys.exit("error: measurement wraps around midnight.")
 yyyy_mm_dd = start_yyyy_mm_dd
 
+# Check whether data is available (ERA5 data is usually available
+# after 3 months delay). If not, use ERA from a year earlier.
+target_date = date.strptime(yyyy_mm_dd, "%Y-%m-%d")
+months_ago = date.today() - relativedelta(months=3)
+if target_date > months_ago:
+    override_year = True
+else:
+    override_year = False
+
+if override_year:
+    print("OVERRIDING YEAR")
+    print("YEAR OF DATA:", yyyy_mm_dd[:4])
+    today_str =  (date.today() - relativedelta(years=1)).isoformat()
+    yyyy_mm_dd = today_str[:4] + yyyy_mm_dd[4:]
+    print("NEW YEAR:", yyyy_mm_dd[:4])
+        
 yyyymmdd = "".join(yyyy_mm_dd.split("-"))
 
 retrieve_parameters["date"] = yyyy_mm_dd

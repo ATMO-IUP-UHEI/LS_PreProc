@@ -26,7 +26,7 @@ def main():
     sources = generate_source_list(sources)
     dims = generate_dims()
 
-    l1b = xr.open_dataset("SYNTH_SPECTRA/L1B_DATA.nc")
+    l1b = xr.open_dataset("DATA_IN/L1B_DATA.nc")
     atm = create_atm(l1b, dims)
 
     atm = get_data(atm, general, sources, dims)
@@ -198,7 +198,7 @@ def get_time(atm):
 
 
 def write_data(atm):
-    output = "SYNTH_SPECTRA/ATM_DATA.nc"
+    output = "DATA_IN/ATM_DATA.nc"
 
     history_string = \
         "Created using the ATM preprocessor for RemoTeC."

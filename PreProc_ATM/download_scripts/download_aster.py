@@ -16,7 +16,7 @@ def main():
 
 
 def generate_file_list_from_l1b_file():
-    l1b_file = "SYNTH_SPECTRA/L1B_DATA.nc"
+    l1b_file = "DATA_IN/L1B_DATA.nc"
     l1b_data = xr.open_dataset(l1b_file)
 
     min_latitude = int(np.floor(l1b_data.latitude.min().values))
@@ -51,10 +51,12 @@ def generate_file_list_from_l1b_file():
 
 def download_files(file_name_list):
     with Session() as session:
-        token = getpass("Enter token. If you don't have a token, get one from "
-                        + "https://urs.earthdata.nasa.gov/. It will have an "
-                        + "expiration date.\n\ttoken (your input will be "
-                        + "hidden): ")
+        #token = getpass("Enter token. If you don't have a token, get one from "
+        #                + "https://urs.earthdata.nasa.gov/. It will have an "
+        #                + "expiration date.\n\ttoken (your input will be "
+        #                + "hidden): ")
+        print("Using token in ~/.earthdata_token")
+        token = open(os.path.expanduser('~')+'/.earthdata_token').read().strip()
         session.headers = {"Authorization": f"Bearer {token}"}
 
         for file_name in file_name_list:

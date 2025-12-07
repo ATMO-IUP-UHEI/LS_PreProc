@@ -6,4 +6,4 @@
 #SBATCH --job-name=PreProc_L1B         # Job name
 #SBATCH --output=slurm/preproc/l1b.log # Log file (stores stdout/stderr)
 #SBATCH --error=slurm/preproc/l1b.log  # Error file (if errors occur)
-python /home/hd/hd_hd/hd_oc152/software/RemoTeC/bin/PreProc_L1B/main.py $1
+python /home/hd/hd_hd/hd_oc152/software/RemoTeC/LS_PreProc/PreProc_L1B/main.py $1

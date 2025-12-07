@@ -186,7 +186,7 @@ def write_data(instrument_name, root, band_list, input_file_list):
 
     root.attrs["history"] = history_string
 
-    output_file_name = os.path.join("SYNTH_SPECTRA", "L1B_DATA.nc")
+    output_file_name = os.path.join("DATA_IN", "L1B_DATA.nc")
 
     for group_num, output_data in enumerate([root, *band_list]):
         for var in output_data.data_vars:

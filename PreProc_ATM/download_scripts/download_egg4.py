@@ -5,7 +5,7 @@ import numpy as np
 import cdsapi
 
 
-l1b_file = "SYNTH_SPECTRA/L1B_DATA.nc"
+l1b_file = "DATA_IN/L1B_DATA.nc"
 l1b_data = xr.open_dataset(l1b_file)
 
 # deal with datetime now
@@ -41,7 +41,7 @@ else:
         override_year = False
 
     if override_year:
-        print("OVERRIDING YEAR")
+        print("OVERRIDING YEAR IN", yyyy_mm_dd)
         print("YEAR OF DATA:", yyyy_mm_dd[:4])
         yyyy_mm_dd = "2020" + yyyy_mm_dd[4:]
         print("NEW YEAR:", yyyy_mm_dd[:4])

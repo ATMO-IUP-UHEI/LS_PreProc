@@ -2,7 +2,7 @@ mkdir $1
 mkdir $1/CONTRL_OUT
 mkdir $1/INI
 mkdir $1/LST
-mkdir $1/SYNTH_SPECTRA
+mkdir $1/DATA_IN
 mkdir $1/tmp
 mkdir $1/tmp/spectra
 mkdir $1/tmp/meteo

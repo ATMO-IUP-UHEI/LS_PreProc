@@ -15,14 +15,19 @@ def main(atm, auxiliary_data_path, era5_folder_path, nlevel, dims):
     # era5_data comes in multilayer (ml) and surface (sfc) files
     era5_ml = get_era5(atm, era5_folder_path, "ml")
     era5_sfc = get_era5(atm, era5_folder_path, "sfc")
-
+    
     # drop unnecessary variables from era5_data and rename needed ones
     era5_ml = prepare_era5(era5_ml, "ml")
     era5_sfc = prepare_era5(era5_sfc, "sfc")
 
+    # if no data was available for desired year, previous years can be
+    # downloaded. This script handles this case as an input.
+    era5_ml, year_differs, used_year = correct_year(atm, era5_ml)
+    era5_sfc, year_differs, used_year = correct_year(atm, era5_sfc)
+
     # merge multilevel and surface datasets
     era5 = merge_era5(era5_ml, era5_sfc, dims)
-
+  
     # calculate pressure grid on era5_levels
     era5 = calculate_era5_pressure(era5, auxiliary_data_path, era5_folder_path)
 
@@ -86,9 +91,10 @@ def main(atm, auxiliary_data_path, era5_folder_path, nlevel, dims):
 
 def get_era5(atm, era5_folder_path, era5_type):
     file_name_list = generate_file_list_from_atm(atm, era5_type)
-
+    
     era5_data_set = False
     for file_name in file_name_list:
+        
         era5 = xr.open_dataset(
             f"{era5_folder_path}/{file_name}", engine="cfgrib"
         )
@@ -106,7 +112,7 @@ def generate_file_list_from_atm(atm, era5_type):
     yyyymmdd = "".join(str(min(atm.time).values)[:10].split("-"))
 
     file_name_list = [f"era5_{era5_type}_{yyyymmdd}.grb"]
-
+    
     return file_name_list
 
 
@@ -180,6 +186,37 @@ def merge_era5(era5_ml, era5_sfc, dims):
 
     return era5
 
+def correct_year(atm, era5):
+    # if year in atm differs from year in era5 it means that no data was
+    # available for the desired year. Instead, data for a preceding year was
+    # downloaded and this needs to be accounted for. We will just act as if
+    # the data is from the desired year, but write a little annotation into
+    # the data's attributes.
+    year_differs = False
+    atm_time = str(atm.time.values[0])
+    era5_time = str(era5.time.values[0])
+
+    desired_year = int(atm_time[:4])
+    used_year = int(era5_time[:4])
+
+    if desired_year == used_year:
+        return era5, year_differs, None
+
+    year_differs = True
+    for index, time in enumerate(era5.time.values):
+        # numpy datetime64 objects are hard to work with. Convert them into
+        # regular datetime objects, do changes, then convert back.
+        epoch = np.datetime64("1970-01-01T00:00:00Z")
+        # convert to timestamp:
+        ts = (time - epoch) / np.timedelta64(1, "s")
+        # timestamp to standard utctime
+        dt = datetime.utcfromtimestamp(ts)
+        # replace year
+        dt = dt.replace(year=desired_year)
+        # utctime to numpy datetime64
+        era5.time.values[index] = np.datetime64(dt)
+    
+    return era5, year_differs, used_year
 
 def calculate_era5_pressure(era5, auxiliary_data_path, era5_folder_path):
     # get standard ecmwd atmosphere parameters from file downloaded from
@@ -207,7 +244,6 @@ def calculate_era5_pressure(era5, auxiliary_data_path, era5_folder_path):
         data=pressure,
         dims=("time", "era5_level", "latitude", "longitude")
     )
-
     era5 = era5.drop("surface_pressure")
 
     return era5
@@ -218,23 +254,23 @@ def calculate_era5_geometric_altitude(atm, era5):
     # get surface elevation from surface geopotential
     surface_elevation = \
         era5.surface_geopotential / constants.gravitational_acceleration()
-
+    
     geometric_altitude = \
         surface_elevation \
         + constants.scale_height \
         * np.log(era5.pressure[:, -1, :, :]/era5.pressure[:, :, :, :])
-
+    
     geometric_altitude = geometric_altitude.transpose(
         "time", "era5_level", "latitude", "longitude"
     )
-
+    
     era5["geometric_altitude"] = xr.DataArray(
         data=geometric_altitude,
         dims=("time", "era5_level", "latitude", "longitude")
     )
-
+ 
     era5 = era5.drop("surface_geopotential")
-
+    
     return era5
 
 
@@ -254,21 +290,25 @@ def calculate_era5_h2o_mole_fraction(era5):
         data=h2o,
         dims=("time", "era5_level", "latitude", "longitude")
     )
-
+ 
     era5 = era5.drop("specific_humidity")
 
     return era5
 
 
 def interpolate_era5_onto_atm(atm, era5, dims):
+    print(atm.time.values)
+    print(atm.latitude.values)
+    print(atm.longitude.values)
     era5 = era5.interp(
         time=atm.time,
         latitude=atm.latitude,
         longitude=atm.longitude
     )
-
+    print(era5.temperature.values)
+    
     era5 = era5.transpose(dims["y"], dims["x"], "era5_level")
-
+    
     return era5
 
 
@@ -280,10 +320,10 @@ def correct_surface_elevation(atm, era5):
     era5["wind_v_component"] = era5.wind_v_component.where(above_ground)
     era5["geometric_altitude"] = era5.geometric_altitude.where(above_ground)
     era5["h2o"] = era5.h2o.where(above_ground)
-
+    
     ground_level = \
         era5.geometric_altitude.argmin(dim="era5_level", skipna=True)
-
+    
     elevation_difference = \
         era5.geometric_altitude[..., ground_level] - atm.surface_elevation
 
@@ -388,7 +428,7 @@ def interpolate_era5_onto_pressure_grid(atm, era5, nlevel, dims):
     era5_interpolated = xr.merge(
         [era5_level_vars_interpolated, era5_surface_vars]
     )
-
+ 
     return era5_interpolated
 
 
