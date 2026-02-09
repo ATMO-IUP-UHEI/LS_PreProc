@@ -1,10 +1,9 @@
 import xarray as xr
 import numpy as np
+import geopy.distance
 # from scipy.optimize import curve_fit
 import matplotlib.pyplot as plt
 import sys
-
-import plot_functions
 
 
 def main():
@@ -117,9 +116,27 @@ def plot(x, y, rgb):
         np.min(x), np.max(x),
         np.min(y), np.max(y)
     ]
-    aspect = plot_functions.get_aspect(*data_lims)
+    aspect = get_aspect(*data_lims)
     plt.gca().set_aspect(aspect)
     plt.show()
+
+
+def get_aspect(x_min, x_max, y_min, y_max):
+    north = (y_max, np.mean((x_min, x_max)))
+    east = (np.mean((y_min, y_max)), x_max)
+    south = (y_min, np.mean((x_min, x_max)))
+    west = (np.mean((y_min, y_max)), x_min)
+
+    y_distance_angle = y_max - y_min
+    x_distance_angle = x_max - x_min
+
+    y_distance_length = geopy.distance.geodesic(south, north).km
+    x_distance_length = geopy.distance.geodesic(west, east).km
+
+    aspect = (y_distance_length / x_distance_length) \
+        / (y_distance_angle / x_distance_angle)
+
+    return aspect
 
 
 if __name__ == "__main__":
