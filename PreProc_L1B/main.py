@@ -141,7 +141,7 @@ def set_attributes(root, band_list, dims):
         band.radiance.attrs["long_name"] = \
             "at-sensor radiance"
         band.radiance.attrs["units"] = \
-            "photons s-1 cm-2 sr-1 nm-1"
+            "W m-2 sr-1 nm-1"
 
         assert "radiance_noise" in band.data_vars
         assert band.radiance_noise.dims == (dims["y"], dims["x"], dims["z"])
@@ -149,7 +149,7 @@ def set_attributes(root, band_list, dims):
         band.radiance_noise.attrs["long_name"] = \
             "noise of at-sensor radiance"
         band.radiance_noise.attrs["units"] = \
-            "photons s-1 cm-2 sr-1 nm-1"
+            "W m-2 sr-1 nm-1"
 
         if "radiance_error" in band.data_vars:
             assert band.radiance_error.dims == \
@@ -158,7 +158,7 @@ def set_attributes(root, band_list, dims):
             band.radiance_error.attrs["long_name"] = \
                 "realization of Gaussian noise added onto synthetic radiance"
             band.radiance_error.attrs["units"] = \
-                "photons s-1 cm-2 sr-1 nm-1"
+                "W m-2 sr-1 nm-1"
 
 
 def write_data(instrument_name, root, band_list, input_file_list):
