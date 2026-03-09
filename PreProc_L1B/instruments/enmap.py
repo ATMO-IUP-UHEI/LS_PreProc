@@ -384,12 +384,7 @@ def get_spectrum(meta, l1b, spectral_domain):
     )
 
     # Calculate radiance using EnMAP product specification p.14
-    # It doesn't say in what way the gain and offset have to be applied to the
-    # digital signal, but I am following along with Luis Guanter's read
-    # routine.
-    # Furthermore, Section 4 mentions a background value, not sure what that
-    # is for, but it is zero for L1B data.
-    # radiance in W m-2 sr-1 nm-1
+    # radiance / W m-2 sr-1 nm-1
     radiance = \
         digital_number[:, :, :] * gain[:, None, None] + offset[:, None, None]
 
@@ -397,12 +392,11 @@ def get_spectrum(meta, l1b, spectral_domain):
     radiance = np.moveaxis(radiance, [0, 1, 2], [2, 0, 1])
 
     # Get radiance noise with dimension (temporal, spatial, spectral)
-    # Calculate radiance noise using SNR provided in EnMAP Instrument
-    # Specification
+    # Calculate radiance noise using SNR reported in Storch et al. (2023)
     if spectral_domain == "swir":
-        snr = 150/1
+        snr = 230/1
     elif spectral_domain == "vnir":
-        snr = 500/1
+        snr = 620/1
     else:
         sys.exit("invalid spectral domain")
     radiance_noise = radiance / snr
