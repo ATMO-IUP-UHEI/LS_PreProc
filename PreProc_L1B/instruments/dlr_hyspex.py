@@ -154,12 +154,8 @@ def get_spectrum(input_data):
     radiance = input_data.radiance
 
     # Convert units
-    # mW m-2 sr-1 nm-1 -> photons s-1 cm-2 sr-1 nm-1
-    planck_constant = 6.62607015e-34  # J s
-    light_speed = 299792458  # m s-1
-    radiance = \
-        radiance * 1e-4 * wavelength * 1e-9 \
-        / planck_constant / light_speed
+    # mW m-2 sr-1 nm-1 -> W m-2 sr-1 nm-1
+    radiance = radiance * 1e-3
 
     # Calculate radiance noise from radiance using signal-to-noise ratio
     print("TODO LS: I AM MAKING UP AN SNR FOR NOW. CHANGE THIS !!!!")

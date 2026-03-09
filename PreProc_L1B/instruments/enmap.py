@@ -401,18 +401,6 @@ def get_spectrum(meta, l1b, spectral_domain):
         sys.exit("invalid spectral domain")
     radiance_noise = radiance / snr
 
-    # convert units
-    # radiance, radiance_noise
-    # W m-2 sr-1 nm-1 -> photons s-1 cm-2 sr-1 nm-1
-    planck_constant = 6.62607015e-34  # J s
-    light_speed = 299792458  # m s-1
-    radiance = \
-        radiance * 1e-4 * wavelength * 1e-9 \
-        / planck_constant / light_speed
-    radiance_noise = \
-        radiance_noise * 1e-4 * wavelength * 1e-9 \
-        / planck_constant / light_speed
-
     return wavelength, fwhm, radiance, radiance_noise
 
 

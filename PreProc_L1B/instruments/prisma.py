@@ -187,6 +187,11 @@ def get_spectrum(l1b, spectral_domain):
     # radiance in W m-2 sr-1 um-1
     radiance = digital_number / scale_factor - offset
 
+    # convert units
+    # radiance
+    # W m-2 sr-1 um-1 -> W m-2 sr-1 nm-1
+    radiance = radiance * 1e-3
+
     # (spatial, spectral, temporal) -> (temporal, spatial, spectral)
     radiance = np.moveaxis(radiance, [0, 1, 2], [1, 2, 0])
 
@@ -217,17 +222,5 @@ def get_spectrum(l1b, spectral_domain):
     wavelength = np.array(wavelength)[sort_indices]
     radiance = np.array(radiance)[:, :, sort_indices]
     radiance_noise = np.array(radiance_noise)[:, :, sort_indices]
-
-    # convert units
-    # radiance, radiance_noise
-    # W m-2 sr-1 um-1 -> photons s-1 cm-2 sr-1 nm-1
-    planck_constant = 6.62607015e-34  # J s
-    light_speed = 299792458  # m s-1
-    radiance = \
-        radiance * 1e-7 * wavelength * 1e-9 \
-        / planck_constant / light_speed
-    radiance_noise = \
-        radiance_noise * 1e-7 * wavelength * 1e-9 \
-        / planck_constant / light_speed
 
     return wavelength, radiance, radiance_noise
